@@ -494,15 +494,26 @@
         function getWallets() {
             console.log('🔍 Getting available wallets...');
             const foundWallets = [];
+            const walletNames = new Set(); // Track wallet names to avoid duplicates
 
-            // Check for Phantom Sui support
-            if (window.phantom?.sui) {
-                console.log('✅ Found Phantom with Sui support');
+            // Check for Wallet Standard API FIRST (Suiet, Slush, and standards-compliant wallets)
+            if (window.wallets && typeof window.wallets.get === 'function') {
+                console.log('✅ Found Wallet Standard API (window.wallets)');
+                const standardWallets = window.wallets.get();
+                console.log('💼 Standard wallets:', standardWallets);
+
+                for (const wallet of standardWallets) {
+                    console.log(`  - ${wallet.name} (Standard API)`);
+                    foundWallets.push(wallet);
+                    walletNames.add(wallet.name);
+                }
+            }
+
+            // Check for Phantom Sui support (only if not already in standard wallets)
+            if (window.phantom?.sui && !walletNames.has('Phantom')) {
+                console.log('✅ Found Phantom with Sui support (using custom wrapper)');
                 console.log('🔍 Phantom.sui object:', window.phantom.sui);
                 console.log('🔍 Available methods:', Object.keys(window.phantom.sui));
-                console.log('🔍 typeof requestAccount:', typeof window.phantom.sui.requestAccount);
-                console.log('🔍 typeof signAndExecuteTransaction:', typeof window.phantom.sui.signAndExecuteTransaction);
-                console.log('🔍 typeof signTransaction:', typeof window.phantom.sui.signTransaction);
 
                 foundWallets.push({
                     name: 'Phantom',
@@ -513,7 +524,6 @@
                         'standard:connect': {
                             connect: async () => {
                                 console.log('🔌 Connecting to Phantom...');
-                                console.log('Available Phantom methods:', Object.getOwnPropertyNames(window.phantom.sui));
 
                                 try {
                                     let resp;
@@ -526,15 +536,9 @@
                                     } else if (typeof window.phantom.sui.requestAccounts === 'function') {
                                         console.log('Using requestAccounts()...');
                                         resp = await window.phantom.sui.requestAccounts();
-                                        console.log('requestAccounts response:', resp);
                                     } else if (typeof window.phantom.sui.connect === 'function') {
                                         console.log('Using connect()...');
                                         resp = await window.phantom.sui.connect();
-                                        console.log('connect response:', resp);
-                                    } else if (typeof window.phantom.sui.getAccounts === 'function') {
-                                        console.log('Using getAccounts()...');
-                                        resp = await window.phantom.sui.getAccounts();
-                                        console.log('getAccounts response:', resp);
                                     } else {
                                         throw new Error('No known connection method found on Phantom');
                                     }
@@ -544,11 +548,9 @@
                                     // Handle different response formats
                                     let address, publicKey;
                                     if (Array.isArray(resp) && resp.length > 0) {
-                                        // Response is array of accounts
                                         address = resp[0].address || resp[0];
                                         publicKey = resp[0].publicKey;
                                     } else if (resp.address) {
-                                        // Response is single account object
                                         address = resp.address;
                                         publicKey = resp.publicKey;
                                     } else {
@@ -564,14 +566,12 @@
                                     };
                                 } catch (err) {
                                     console.error('❌ Phantom connection failed:', err);
-                                    console.error('Error details:', err.message, err.stack);
                                     throw err;
                                 }
                             }
                         },
                         'standard:events': {
                             on: (event, handler) => {
-                                console.log('Registering event handler:', event);
                                 if (typeof window.phantom.sui.on === 'function') {
                                     window.phantom.sui.on(event, handler);
                                 }
@@ -580,7 +580,6 @@
                         'sui:signAndExecuteTransactionBlock': {
                             signAndExecuteTransactionBlock: async ({ transactionBlock, account, chain }) => {
                                 console.log('🔐 Signing transaction with Phantom...');
-                                console.log('Transaction block:', transactionBlock);
 
                                 try {
                                     // Phantom uses signAndExecuteTransaction (not signAndExecuteTransactionBlock)
@@ -602,23 +601,13 @@
                     },
                     _phantom: window.phantom.sui // Store reference
                 });
+                walletNames.add('Phantom');
+            } else if (walletNames.has('Phantom')) {
+                console.log('ℹ️  Phantom already in Wallet Standard API, skipping custom wrapper');
             }
 
-            // Check for Wallet Standard API (window.wallets)
-            if (window.wallets && typeof window.wallets.get === 'function') {
-                console.log('✅ Found Wallet Standard API (window.wallets)');
-                const standardWallets = window.wallets.get();
-                console.log('💼 Standard wallets:', standardWallets);
-                foundWallets.push(...standardWallets);
-            }
-
-            // Legacy check for window.suiWallet
-            if (window.suiWallet) {
-                console.log('✅ Found legacy suiWallet');
-                // Add legacy wallet support if needed
-            }
-
-            console.log(`📊 Total wallets found: ${foundWallets.length}`, foundWallets.map(w => w.name));
+            console.log(`📊 Total wallets found: ${foundWallets.length}`);
+            foundWallets.forEach((w, i) => console.log(`  ${i + 1}. ${w.name}`));
             return foundWallets;
         }
 
