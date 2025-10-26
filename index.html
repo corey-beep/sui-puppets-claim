@@ -482,6 +482,23 @@
         let currentWallet = null;
         let royaltyBalance = 0;
 
+        // Listen for wallet registration events
+        console.log('🎧 Setting up wallet registration listeners...');
+
+        // Wallet Standard event listener
+        window.addEventListener('wallet-standard:app-ready', () => {
+            console.log('📢 wallet-standard:app-ready event fired');
+            setTimeout(() => {
+                console.log('Checking wallets after app-ready...');
+                const wallets = getWallets();
+                console.log('Found wallets:', wallets.map(w => w.name));
+            }, 100);
+        });
+
+        window.addEventListener('wallet-standard:register-wallet', (event) => {
+            console.log('📢 wallet-standard:register-wallet event fired:', event.detail);
+        });
+
         // Detect wallet on page load
         console.log('🔍 Checking for Sui Wallets...');
         console.log('window.phantom:', window.phantom);
@@ -511,6 +528,15 @@
         console.log('window.slush:', window.slush);
         console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
         console.log('All window properties with "wallet":', Object.keys(window).filter(k => k.toLowerCase().includes('wallet')));
+
+        // Re-check after a delay to see if wallets injected late
+        setTimeout(() => {
+            console.log('\n🔄 Re-checking after 2 seconds...');
+            console.log('window.wallets:', window.wallets);
+            console.log('window.suiet:', window.suiet);
+            console.log('window.slush:', window.slush);
+            console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
+        }, 2000);
 
         // Helper to create wallet wrapper for standard interface
         function createWalletWrapper(name, walletApi) {
@@ -786,6 +812,28 @@
             }
         }
 
+        // Wait for wallets to register (they inject asynchronously)
+        async function waitForWallets(maxWaitMs = 3000) {
+            console.log('⏳ Waiting for wallets to register...');
+            const startTime = Date.now();
+            const checkInterval = 100; // Check every 100ms
+
+            return new Promise((resolve) => {
+                const check = () => {
+                    const wallets = getWallets();
+                    const elapsed = Date.now() - startTime;
+
+                    if (wallets.length > 0 || elapsed >= maxWaitMs) {
+                        console.log(`✅ Wallet detection complete after ${elapsed}ms - found ${wallets.length} wallet(s)`);
+                        resolve(wallets);
+                    } else {
+                        setTimeout(check, checkInterval);
+                    }
+                };
+                check();
+            });
+        }
+
         // Connect wallet button handler
         document.getElementById('connectButton').addEventListener('click', async () => {
             console.log('👆 Connect button clicked');
@@ -798,12 +846,14 @@
                     phantom: window.phantom,
                     wallets: window.wallets,
                     suiWallets: window.suiWallets,
-                    suiWallet: window.suiWallet
+                    suiWallet: window.suiWallet,
+                    suiet: window.suiet,
+                    slush: window.slush
                 };
                 console.log('📦 Available wallet providers:', walletProviders);
 
-                // Get all available wallets
-                const wallets = getWallets();
+                // Wait for wallets to register (they load async)
+                const wallets = await waitForWallets(3000);
                 availableWallets = wallets;
 
                 if (wallets && wallets.length > 0) {
@@ -822,19 +872,19 @@
 
                 } else {
                     console.error('❌ No Sui Wallet detected');
-                    console.log('Please install Sui Wallet extension from:');
-                    console.log('https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
+                    console.log('Please install a Sui Wallet extension');
 
                     // Show the installation warning
                     document.getElementById('installWarning').classList.remove('hidden');
 
                     alert('⚠️ Sui Wallet Extension Required\n\n' +
-                        'You need to install the Sui Wallet browser extension first.\n\n' +
-                        'Steps:\n' +
-                        '1. Click the "Install Sui Wallet Extension" button on this page\n' +
-                        '2. Install the extension from Chrome Web Store\n' +
-                        '3. Refresh this page\n' +
-                        '4. Click "Connect Sui Wallet" again');
+                        'You need to install a Sui Wallet browser extension first.\n\n' +
+                        'Supported wallets:\n' +
+                        '• Sui Wallet\n' +
+                        '• Suiet Wallet\n' +
+                        '• Phantom (with Sui enabled)\n' +
+                        '• Slush Wallet\n\n' +
+                        'After installing, refresh this page and try again.');
                     return;
                 }
             } catch (error) {
