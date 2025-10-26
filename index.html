@@ -226,11 +226,76 @@
         .explorer-link:hover {
             text-decoration: underline;
         }
+
+        .install-warning {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .install-warning h2 {
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .install-warning ol {
+            margin: 15px 0 15px 25px;
+            line-height: 1.8;
+        }
+
+        .install-warning a {
+            color: white;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .install-btn {
+            background: white;
+            color: #ee5a6f;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.2s;
+        }
+
+        .install-btn:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Puppets NFT Admin Dashboard</h1>
+
+        <!-- Installation Warning (shown when no wallet detected) -->
+        <div id="installWarning" class="install-warning hidden">
+            <h2>⚠️ Sui Wallet Not Detected</h2>
+            <p>To use this dashboard, you need to install the Sui Wallet browser extension:</p>
+            <ol>
+                <li>Click the button below to install Sui Wallet</li>
+                <li>After installation, <strong>refresh this page</strong></li>
+                <li>Click "Connect Sui Wallet" to continue</li>
+            </ol>
+            <a href="https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank">
+                <button class="install-btn">📥 Install Sui Wallet Extension</button>
+            </a>
+            <p style="margin-top: 15px; font-size: 0.9rem; opacity: 0.9;">
+                Works with Chrome, Brave, Edge, and other Chromium browsers
+            </p>
+        </div>
 
         <div class="wallet-connect">
             <button id="connectButton" class="connect-btn">Connect Sui Wallet</button>
@@ -431,7 +496,16 @@
                     console.log('Please install Sui Wallet extension from:');
                     console.log('https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
 
-                    alert('⚠️ No Sui Wallet Detected\n\nPlease:\n1. Install Sui Wallet extension\n2. Refresh this page\n\nDownload: https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
+                    // Show the installation warning
+                    document.getElementById('installWarning').classList.remove('hidden');
+
+                    alert('⚠️ Sui Wallet Extension Required\n\n' +
+                        'You need to install the Sui Wallet browser extension first.\n\n' +
+                        'Steps:\n' +
+                        '1. Click the "Install Sui Wallet Extension" button on this page\n' +
+                        '2. Install the extension from Chrome Web Store\n' +
+                        '3. Refresh this page\n' +
+                        '4. Click "Connect Sui Wallet" again');
                     return;
                 }
             } catch (error) {
@@ -712,11 +786,20 @@
                     console.log('- typeof window.suiWallets:', typeof window.suiWallets);
                     console.log('- window.suiWallets?.get:', window.suiWallets?.get);
 
-                    document.querySelector('.wallet-connect').innerHTML +=
-                        '<p style="color: #dc3545; margin-top: 15px; font-size: 0.9rem;">⚠️ No Sui Wallet detected.<br>Please install <a href="https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank" style="color: #dc3545; font-weight: bold;">Sui Wallet extension</a> and refresh this page.</p>';
+                    // Show prominent installation warning
+                    document.getElementById('installWarning').classList.remove('hidden');
+
+                    // Disable connect button
+                    const connectBtn = document.getElementById('connectButton');
+                    connectBtn.disabled = true;
+                    connectBtn.textContent = 'No Wallet Detected';
+                    connectBtn.style.opacity = '0.5';
                 } else {
                     console.log('✅ Sui Wallet detected on page load');
                     console.log(`Found ${wallets.length} wallet(s):`, wallets.map(w => w.name));
+
+                    // Hide installation warning if wallet is detected
+                    document.getElementById('installWarning').classList.add('hidden');
                 }
             }, 1000); // Increased to 1 second to give more time for extension to load
         });
