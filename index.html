@@ -593,73 +593,16 @@
         console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
         console.log('All window properties with "wallet":', Object.keys(window).filter(k => k.toLowerCase().includes('wallet')));
 
-        // Comprehensive wallet property scanner
-        function scanForWalletProperties() {
-            console.log('\n🔍 COMPREHENSIVE WALLET SCAN:');
-            console.log('='.repeat(60));
-
-            // Check all known wallet property names
-            const knownWalletProps = [
-                'wallets', 'wallet', 'sui', 'suiet', 'slush', 'phantom',
-                'suiWallet', 'suiWallets', 'SuiWallet', 'Sui', 'SUIET', 'SLUSH',
-                'martian', 'ethos', 'ethosWallet', 'glass', 'glassWallet'
-            ];
-
-            console.log('Known wallet properties:');
-            knownWalletProps.forEach(prop => {
-                const value = window[prop];
-                if (value !== undefined) {
-                    console.log(`  ✓ window.${prop}:`, value);
-                    if (typeof value === 'object' && value !== null) {
-                        console.log(`    Keys:`, Object.keys(value).slice(0, 10));
-                    }
-                } else {
-                    console.log(`  ✗ window.${prop}: undefined`);
-                }
-            });
-
-            // Search for any properties that might be wallet-related
-            console.log('\nAll window properties (searching for wallet-related):');
-            const allProps = Object.keys(window);
-            console.log(`  Total properties: ${allProps.length}`);
-
-            const suspiciousProps = allProps.filter(k => {
-                const lower = k.toLowerCase();
-                return lower.includes('wallet') ||
-                       lower.includes('sui') ||
-                       lower.includes('slush') ||
-                       lower.includes('suiet') ||
-                       lower.includes('phantom') ||
-                       lower.includes('web3') ||
-                       lower.includes('ethereum') ||
-                       lower.includes('crypto');
-            });
-
-            console.log(`  Found ${suspiciousProps.length} potentially wallet-related properties:`);
-            suspiciousProps.forEach(prop => {
-                const value = window[prop];
-                console.log(`    • window.${prop}:`, typeof value, value);
-            });
-
-            // Check for wallet standard
-            if (window.addEventListener) {
-                console.log('\n📢 Dispatching wallet-standard:app-ready event...');
-                window.dispatchEvent(new Event('wallet-standard:app-ready'));
-            }
-
-            return suspiciousProps;
-        }
-
         // Re-check after a delay to see if wallets injected late
         setTimeout(() => {
-            console.log('\n🔄 Re-checking after 2 seconds...');
+            console.log('\n🔄 Re-checking wallet detection after 2 seconds...');
             console.log('window.wallets:', window.wallets);
             console.log('window.suiet:', window.suiet);
             console.log('window.slush:', window.slush);
-            console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
 
-            // Run comprehensive scan
-            scanForWalletProperties();
+            // Check if Mysten library detects any new wallets
+            const wallets = getWallets();
+            console.log(`Found ${wallets.length} Sui wallets:`, wallets.map(w => w.name));
         }, 2000);
 
         // Helper to create wallet wrapper for standard interface
@@ -787,8 +730,8 @@
 
                 // Get registered wallets
                 const registeredWallets = walletsApi.get();
-                console.log('💼 Registered wallets:', registeredWallets);
-                console.log(`📊 Total wallets found: ${registeredWallets.length}`);
+                console.log('💼 Registered wallets (raw):', registeredWallets);
+                console.log(`📊 Total wallets found (raw): ${registeredWallets.length}`);
 
                 registeredWallets.forEach((w, i) => {
                     console.log(`  ${i + 1}. ${w.name} (v${w.version})`);
@@ -796,12 +739,73 @@
                     console.log(`     Features: ${Object.keys(w.features).join(', ')}`);
                 });
 
+                // Filter to only Sui-compatible wallets
+                const suiWallets = registeredWallets.filter(wallet => {
+                    const hasSuiChain = wallet.chains.some(chain =>
+                        chain.startsWith('sui:') || chain.toLowerCase().includes('sui')
+                    );
+                    if (hasSuiChain) {
+                        console.log(`  ✓ ${wallet.name} supports Sui`);
+                    } else {
+                        console.log(`  ✗ ${wallet.name} does NOT support Sui (chains: ${wallet.chains.join(', ')})`);
+                    }
+                    return hasSuiChain;
+                });
+
+                // Deduplicate by wallet name (Phantom registers 3 times for different chains)
+                const uniqueWallets = [];
+                const seenNames = new Set();
+
+                suiWallets.forEach(wallet => {
+                    if (!seenNames.has(wallet.name)) {
+                        uniqueWallets.push(wallet);
+                        seenNames.add(wallet.name);
+                        console.log(`  ➕ Added ${wallet.name} to list`);
+                    } else {
+                        console.log(`  ⏭️  Skipped duplicate ${wallet.name}`);
+                    }
+                });
+
+                console.log(`\n✅ Final Sui wallet count (from Wallet Standard): ${uniqueWallets.length}`);
+                uniqueWallets.forEach((w, i) => console.log(`  ${i + 1}. ${w.name}`));
+
+                // Manual fallback detection for wallets that don't use Wallet Standard
+                console.log('\n🔍 Checking for wallets via manual detection (window properties)...');
+                const manualWallets = [];
+                const manualChecks = [
+                    { key: 'suiet', name: 'Suiet' },
+                    { key: 'slush', name: 'Slush' },
+                    { key: 'suiWallet', name: 'Sui Wallet' },
+                    { key: 'ethos', name: 'Ethos' },
+                    { key: 'martian', name: 'Martian' }
+                ];
+
+                for (const { key, name } of manualChecks) {
+                    if (window[key]) {
+                        console.log(`  ✓ Found window.${key} (${name})`);
+                        // Check if already in uniqueWallets
+                        if (!seenNames.has(name)) {
+                            console.log(`    ➕ ${name} not in Wallet Standard, adding manually`);
+                            manualWallets.push(createWalletWrapper(name, window[key]));
+                            seenNames.add(name);
+                        } else {
+                            console.log(`    ⏭️  ${name} already in Wallet Standard, skipping`);
+                        }
+                    } else {
+                        console.log(`  ✗ window.${key} not found`);
+                    }
+                }
+
+                const finalWallets = [...uniqueWallets, ...manualWallets];
+                console.log(`\n🎯 FINAL wallet count (Standard + Manual): ${finalWallets.length}`);
+                finalWallets.forEach((w, i) => console.log(`  ${i + 1}. ${w.name}`));
+
                 // Listen for new wallets
                 walletsApi.on('register', (wallet) => {
                     console.log('  📢 New wallet registered:', wallet.name);
                 });
 
-                return registeredWallets;
+                return finalWallets;
             } catch (error) {
                 console.error('❌ Error getting wallets from Mysten Wallet Standard:', error);
                 console.log('Falling back to Phantom-only detection...');
