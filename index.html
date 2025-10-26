@@ -275,20 +275,60 @@
             transform: translateY(-2px);
         }
 
+        /* Wallet Selector Modal */
         .wallet-selector {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .wallet-modal {
             background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .wallet-modal h3 {
+            margin: 0 0 20px 0;
+            font-size: 1.5rem;
+            color: #333;
+            text-align: center;
+        }
+
+        .wallet-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
         .wallet-option {
-            background: #f5f5f5;
-            border: 2px solid transparent;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 10px 0;
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 16px 20px;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
@@ -298,23 +338,40 @@
 
         .wallet-option:hover {
             border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            background: #f0f4ff;
+            transform: translateX(5px);
         }
 
-        .wallet-option.selected {
-            border-color: #667eea;
-            background: #f0f4ff;
+        .wallet-option:active {
+            transform: scale(0.98);
         }
 
         .wallet-icon {
             font-size: 2rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .wallet-info {
+            flex: 1;
         }
 
         .wallet-name {
-            font-size: 1.2rem;
-            font-weight: bold;
+            font-size: 1.1rem;
+            font-weight: 600;
             color: #333;
+            margin: 0;
+        }
+
+        .wallet-detected {
+            font-size: 0.85rem;
+            color: #667eea;
+            margin: 2px 0 0 0;
         }
     </style>
 </head>
@@ -322,10 +379,12 @@
     <div class="container">
         <h1>Puppets NFT Admin Dashboard</h1>
 
-        <!-- Wallet Selector (shown when multiple wallets detected) -->
+        <!-- Wallet Selector Modal -->
         <div id="walletSelector" class="wallet-selector hidden">
-            <h2 style="margin-bottom: 15px;">Select Your Wallet</h2>
-            <div id="walletOptions"></div>
+            <div class="wallet-modal">
+                <h3>Choose Wallet</h3>
+                <div id="walletOptions" class="wallet-options"></div>
+            </div>
         </div>
 
         <!-- Installation Warning (shown when no wallet detected) -->
@@ -760,6 +819,19 @@
         // Store available wallets globally
         let availableWallets = [];
 
+        // Get wallet icon/emoji
+        function getWalletIcon(walletName) {
+            const icons = {
+                'Phantom': '👻',
+                'Suiet': '💙',
+                'Sui Wallet': '💎',
+                'Slush': '🌊',
+                'Ethos': '⚡',
+                'Martian': '🚀'
+            };
+            return icons[walletName] || '💳';
+        }
+
         // Show wallet selector UI
         function showWalletSelector(wallets) {
             const selectorDiv = document.getElementById('walletSelector');
@@ -771,25 +843,33 @@
                 const option = document.createElement('div');
                 option.className = 'wallet-option';
                 option.innerHTML = `
-                    <div class="wallet-icon">${wallet.name === 'Phantom' ? '👻' : '💎'}</div>
-                    <div class="wallet-name">${wallet.name}</div>
+                    <div class="wallet-icon">${getWalletIcon(wallet.name)}</div>
+                    <div class="wallet-info">
+                        <div class="wallet-name">${wallet.name}</div>
+                        <div class="wallet-detected">Detected</div>
+                    </div>
                 `;
                 option.addEventListener('click', async () => {
-                    optionsDiv.querySelectorAll('.wallet-option').forEach(el => el.classList.remove('selected'));
-                    option.classList.add('selected');
-
                     // Connect to selected wallet
                     try {
-                        await connectToWallet(wallet);
                         selectorDiv.classList.add('hidden');
+                        await connectToWallet(wallet);
                     } catch (err) {
                         console.error('Error connecting to selected wallet:', err);
+                        selectorDiv.classList.remove('hidden');
                     }
                 });
                 optionsDiv.appendChild(option);
             });
 
             selectorDiv.classList.remove('hidden');
+
+            // Close on background click
+            selectorDiv.onclick = (e) => {
+                if (e.target === selectorDiv) {
+                    selectorDiv.classList.add('hidden');
+                }
+            };
         }
 
         // Connect to a specific wallet
