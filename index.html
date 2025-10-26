@@ -801,7 +801,9 @@
 
         // Show wallet selector
         function showWalletSelector(wallets) {
-            console.log('📋 Showing wallet selector with', wallets.length, 'wallets');
+            console.log('📋 ===== SHOWING WALLET SELECTOR =====');
+            console.log('   Called with', wallets.length, 'wallets');
+            console.trace('Call stack:'); // Show where this was called from
 
             const selectorDiv = document.getElementById('walletSelector');
             const optionsDiv = document.getElementById('walletOptions');
@@ -1309,6 +1311,10 @@
                 }
             }, 1000); // Increased to 1 second to give more time for extension to load
         });
+
+        // Ensure wallet selector is hidden on page load
+        document.getElementById('walletSelector').classList.add('hidden');
+        console.log('🔒 Wallet selector forcibly hidden on page load');
 
         console.log('✅ Dashboard initialization complete');
     </script>
