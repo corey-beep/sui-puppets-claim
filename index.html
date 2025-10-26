@@ -330,85 +330,184 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@mysten/sui.js@0.54.1/dist/index.global.min.js"></script>
     <script type="module">
+        // Enable verbose logging
+        console.log('🚀 Puppets NFT Admin Dashboard - Initializing...');
+
         const PACKAGE_ID = "0xefb46efef2715424b184462c4e3c831456909efe2fbe72b20e4f80e1bd80ce03";
         const NFT_COLLECTION_ID = "0x551188baec211f18e0fb58fa78adfe7ce8eb695bcb545ef2206d7b20a2f373bc";
         const TRANSFER_POLICY_ID = "0x253c5bf8e47014358e1845305b2e133cc2106e24dce1760a4cb2cedb2e0c8032";
         const TRANSFER_POLICY_CAP_ID = "0xf3f42d23f43919b6deb36af6c67bed6c0e4b29a5c9577843021d2d6e59e21b32";
         const RPC_URL = "https://fullnode.mainnet.sui.io:443";
 
+        console.log('📝 Contract IDs loaded:', {
+            PACKAGE_ID,
+            NFT_COLLECTION_ID,
+            TRANSFER_POLICY_ID,
+            TRANSFER_POLICY_CAP_ID
+        });
+
         let currentAccount = null;
         let royaltyBalance = 0;
 
+        // Detect wallet on page load
+        console.log('🔍 Checking for Sui Wallet...');
+        console.log('window.suiWallet:', window.suiWallet);
+        console.log('All window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
+
         // Connect wallet
         document.getElementById('connectButton').addEventListener('click', async () => {
+            console.log('👆 Connect button clicked');
+
             try {
-                if (!window.suiWallet) {
-                    alert('Please install Sui Wallet extension');
+                console.log('🔍 Checking wallet availability...');
+                console.log('window.suiWallet:', window.suiWallet);
+
+                // Check for different wallet providers
+                const walletProviders = {
+                    suiWallet: window.suiWallet,
+                    sui: window.sui,
+                    wallet: window.wallet
+                };
+                console.log('📦 Available wallet providers:', walletProviders);
+
+                // Try to detect Sui Wallet Standard API
+                if (window.sui && window.sui.wallet) {
+                    console.log('✅ Found Sui Wallet Standard API');
+                    try {
+                        const wallets = await window.sui.wallet.getWallets();
+                        console.log('💼 Available wallets:', wallets);
+
+                        if (wallets.length === 0) {
+                            alert('No Sui wallets detected. Please install Sui Wallet extension.');
+                            return;
+                        }
+
+                        const wallet = wallets[0];
+                        console.log('🔐 Connecting to wallet:', wallet.name);
+
+                        const account = await wallet.connect();
+                        console.log('✅ Connected account:', account);
+
+                        currentAccount = account;
+
+                        document.getElementById('connectedAddress').textContent =
+                            currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
+                        document.getElementById('walletInfo').classList.remove('hidden');
+                        document.getElementById('connectButton').textContent = 'Connected';
+                        document.getElementById('connectButton').disabled = true;
+                        document.getElementById('content').classList.remove('hidden');
+
+                        console.log('📊 Loading dashboard data...');
+                        await loadData();
+
+                    } catch (walletError) {
+                        console.error('❌ Wallet Standard API error:', walletError);
+                        throw walletError;
+                    }
+                } else if (window.suiWallet) {
+                    console.log('✅ Found legacy suiWallet API');
+
+                    const accounts = await window.suiWallet.getAccounts();
+                    console.log('📋 Existing accounts:', accounts);
+
+                    if (accounts.length === 0) {
+                        console.log('🔑 Requesting permissions...');
+                        await window.suiWallet.requestPermissions();
+                        const newAccounts = await window.suiWallet.getAccounts();
+                        console.log('📋 New accounts after permission:', newAccounts);
+                        currentAccount = newAccounts[0];
+                    } else {
+                        currentAccount = accounts[0];
+                    }
+
+                    console.log('✅ Connected account:', currentAccount);
+
+                    document.getElementById('connectedAddress').textContent =
+                        currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
+                    document.getElementById('walletInfo').classList.remove('hidden');
+                    document.getElementById('connectButton').textContent = 'Connected';
+                    document.getElementById('connectButton').disabled = true;
+                    document.getElementById('content').classList.remove('hidden');
+
+                    console.log('📊 Loading dashboard data...');
+                    await loadData();
+                } else {
+                    console.error('❌ No Sui Wallet detected');
+                    console.log('Please install Sui Wallet extension from:');
+                    console.log('https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
+                    alert('Please install Sui Wallet extension.\n\nChrome: https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
                     return;
                 }
-
-                const accounts = await window.suiWallet.getAccounts();
-                if (accounts.length === 0) {
-                    await window.suiWallet.requestPermissions();
-                    const newAccounts = await window.suiWallet.getAccounts();
-                    currentAccount = newAccounts[0];
-                } else {
-                    currentAccount = accounts[0];
-                }
-
-                document.getElementById('connectedAddress').textContent =
-                    currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
-                document.getElementById('walletInfo').classList.remove('hidden');
-                document.getElementById('connectButton').textContent = 'Connected';
-                document.getElementById('connectButton').disabled = true;
-                document.getElementById('content').classList.remove('hidden');
-
-                await loadData();
             } catch (error) {
-                console.error('Wallet connection error:', error);
-                alert('Failed to connect wallet: ' + error.message);
+                console.error('❌ Wallet connection error:', error);
+                console.error('Error stack:', error.stack);
+                alert('Failed to connect wallet: ' + error.message + '\n\nCheck console for details (F12)');
             }
         });
 
         async function rpcCall(method, params) {
-            const response = await fetch(RPC_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: 1,
-                    method,
-                    params
-                })
-            });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
-            return data.result;
+            console.log(`🌐 RPC Call: ${method}`, params);
+            try {
+                const response = await fetch(RPC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method,
+                        params
+                    })
+                });
+                const data = await response.json();
+                console.log(`✅ RPC Response: ${method}`, data);
+
+                if (data.error) {
+                    console.error(`❌ RPC Error: ${method}`, data.error);
+                    throw new Error(data.error.message);
+                }
+                return data.result;
+            } catch (error) {
+                console.error(`❌ RPC Call failed: ${method}`, error);
+                throw error;
+            }
         }
 
         async function loadRoyaltyBalance() {
+            console.log('💰 Loading royalty balance...');
             try {
                 const policyData = await rpcCall('sui_getObject', [
                     TRANSFER_POLICY_ID,
                     { showContent: true }
                 ]);
 
+                console.log('📦 TransferPolicy data:', policyData);
+
                 const balance = policyData.data.content.fields.balance;
                 royaltyBalance = parseInt(balance);
                 const suiBalance = (royaltyBalance / 1_000_000_000).toFixed(2);
 
+                console.log(`💵 Royalty balance: ${royaltyBalance} MIST (${suiBalance} SUI)`);
+
                 document.getElementById('royaltyBalance').textContent = `${suiBalance} SUI`;
 
                 // Check if user owns the TransferPolicyCap
+                console.log('🔑 Checking TransferPolicyCap ownership...');
                 const capData = await rpcCall('sui_getObject', [
                     TRANSFER_POLICY_CAP_ID,
                     { showOwner: true }
                 ]);
 
+                console.log('📋 TransferPolicyCap data:', capData);
+
                 const capOwner = capData.data.owner?.AddressOwner;
+                console.log('👤 Cap owner:', capOwner);
+                console.log('👤 Current account:', currentAccount?.address);
+
                 if (capOwner && currentAccount && capOwner === currentAccount.address) {
+                    console.log('✅ User owns the TransferPolicyCap - enabling claim button');
                     document.getElementById('claimButton').disabled = false;
                 } else {
+                    console.log('❌ User does NOT own the TransferPolicyCap - disabling claim button');
                     document.getElementById('claimButton').disabled = true;
                     const statusEl = document.getElementById('claimStatus');
                     statusEl.className = 'note';
@@ -416,25 +515,31 @@
                         <div class="note-title">Permission Required</div>
                         <div class="note-text">
                             You need the TransferPolicyCap to claim royalties.<br>
-                            Cap Owner: ${capOwner ? capOwner.slice(0, 10) + '...' + capOwner.slice(-8) : 'Unknown'}
+                            Cap Owner: ${capOwner ? capOwner.slice(0, 10) + '...' + capOwner.slice(-8) : 'Unknown'}<br>
+                            Your Address: ${currentAccount?.address ? currentAccount.address.slice(0, 10) + '...' + currentAccount.address.slice(-8) : 'Not connected'}
                         </div>
                     `;
                     statusEl.classList.remove('hidden');
                 }
             } catch (error) {
-                console.error('Error loading royalty balance:', error);
+                console.error('❌ Error loading royalty balance:', error);
+                console.error('Error stack:', error.stack);
                 document.getElementById('royaltyBalance').textContent = 'Error loading';
             }
         }
 
         async function loadCollectionStats() {
+            console.log('📊 Loading collection stats...');
             try {
                 const collectionData = await rpcCall('sui_getObject', [
                     NFT_COLLECTION_ID,
                     { showContent: true }
                 ]);
 
+                console.log('📦 Collection data:', collectionData);
+
                 const fields = collectionData.data.content.fields;
+                console.log('📝 Collection fields:', fields);
 
                 document.getElementById('totalMinted').textContent = fields.minted;
                 document.getElementById('premintMinted').textContent = fields.premint_minted;
@@ -444,27 +549,37 @@
                 document.getElementById('publicMinted').textContent = fields.public_minted;
                 document.getElementById('remainingNFTs').textContent = fields.available_ids.length;
 
+                console.log('✅ Collection stats updated');
+
                 // Get treasury address
                 const treasuryAddr = fields.treasury_address;
+                console.log('🏦 Treasury address:', treasuryAddr);
+
                 document.getElementById('treasuryAddress').textContent = treasuryAddr;
                 document.getElementById('treasuryExplorer').href =
                     `https://suiscan.xyz/mainnet/account/${treasuryAddr}`;
 
                 // Get treasury balance
+                console.log('💰 Fetching treasury balance...');
                 const balance = await rpcCall('suix_getBalance', [
                     treasuryAddr,
                     '0x2::sui::SUI'
                 ]);
 
                 const suiBalance = (parseInt(balance.totalBalance) / 1_000_000_000).toFixed(2);
+                console.log(`💵 Treasury balance: ${balance.totalBalance} MIST (${suiBalance} SUI)`);
+
                 document.getElementById('treasuryBalance').textContent = `${suiBalance} SUI`;
+                console.log('✅ Treasury stats updated');
             } catch (error) {
-                console.error('Error loading stats:', error);
+                console.error('❌ Error loading stats:', error);
+                console.error('Error stack:', error.stack);
                 document.getElementById('treasuryBalance').textContent = 'Error loading';
             }
         }
 
         async function claimRoyalties() {
+            console.log('💸 Starting royalty claim process...');
             try {
                 document.getElementById('claimButton').disabled = true;
                 document.getElementById('claimButton').textContent = 'Processing...';
@@ -473,6 +588,8 @@
                 statusEl.className = 'note';
                 statusEl.innerHTML = '<div class="note-text">Building transaction...</div>';
                 statusEl.classList.remove('hidden');
+
+                console.log('🔨 Building transaction...');
 
                 // Build the transaction
                 const tx = {
@@ -491,10 +608,15 @@
                     }
                 };
 
+                console.log('📝 Transaction details:', tx);
+
                 statusEl.innerHTML = '<div class="note-text">Waiting for wallet approval...</div>';
+                console.log('⏳ Waiting for user approval in wallet...');
 
                 // Execute transaction
                 const result = await window.suiWallet.executeMoveCall(tx);
+
+                console.log('✅ Transaction result:', result);
 
                 statusEl.className = 'success';
                 statusEl.innerHTML = `
@@ -505,13 +627,15 @@
                     </a></div>
                 `;
 
+                console.log('🔄 Reloading balances in 2 seconds...');
                 // Reload balances
                 setTimeout(() => {
                     loadData();
                 }, 2000);
 
             } catch (error) {
-                console.error('Error claiming royalties:', error);
+                console.error('❌ Error claiming royalties:', error);
+                console.error('Error stack:', error.stack);
                 const statusEl = document.getElementById('claimStatus');
                 statusEl.className = 'error';
                 statusEl.innerHTML = `Failed to claim: ${error.message}`;
@@ -522,22 +646,47 @@
         }
 
         async function loadData() {
-            await Promise.all([
-                loadRoyaltyBalance(),
-                loadCollectionStats()
-            ]);
+            console.log('📊 Loading all dashboard data...');
+            try {
+                await Promise.all([
+                    loadRoyaltyBalance(),
+                    loadCollectionStats()
+                ]);
+                console.log('✅ All data loaded successfully');
+            } catch (error) {
+                console.error('❌ Error loading data:', error);
+            }
         }
 
         // Claim button handler
+        console.log('🔘 Setting up claim button handler...');
         document.getElementById('claimButton').addEventListener('click', claimRoyalties);
 
-        // Auto-detect Sui Wallet
+        // Auto-detect Sui Wallet on page load
         window.addEventListener('load', () => {
-            if (!window.suiWallet) {
-                document.querySelector('.wallet-connect').innerHTML +=
-                    '<p style="color: #dc3545; margin-top: 15px;">Please install <a href="https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank">Sui Wallet</a></p>';
-            }
+            console.log('🌍 Window loaded, checking for Sui Wallet...');
+            console.log('window.suiWallet:', window.suiWallet);
+            console.log('window.sui:', window.sui);
+
+            // Give wallet extensions time to inject
+            setTimeout(() => {
+                console.log('⏰ Delayed wallet check (after 500ms)...');
+                console.log('window.suiWallet:', window.suiWallet);
+                console.log('window.sui:', window.sui);
+
+                const hasWallet = window.suiWallet || (window.sui && window.sui.wallet);
+
+                if (!hasWallet) {
+                    console.warn('⚠️ No Sui Wallet detected on page load');
+                    document.querySelector('.wallet-connect').innerHTML +=
+                        '<p style="color: #dc3545; margin-top: 15px;">⚠️ No Sui Wallet detected. Please install <a href="https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank">Sui Wallet extension</a> and refresh the page.</p>';
+                } else {
+                    console.log('✅ Sui Wallet detected on page load');
+                }
+            }, 500);
         });
+
+        console.log('✅ Dashboard initialization complete');
     </script>
 </body>
 </html>
