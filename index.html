@@ -275,12 +275,93 @@
             transform: translateY(-2px);
         }
 
+        /* Wallet Selector */
+        .wallet-selector {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .wallet-modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        .wallet-modal h3 {
+            margin: 0 0 24px 0;
+            font-size: 1.5rem;
+            color: #333;
+            text-align: center;
+        }
+
+        .wallet-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .wallet-option {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 18px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .wallet-option:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: translateX(4px);
+        }
+
+        .wallet-icon {
+            font-size: 2.5rem;
+        }
+
+        .wallet-info {
+            flex: 1;
+        }
+
+        .wallet-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .wallet-status {
+            font-size: 0.85rem;
+            color: #667eea;
+            margin-top: 2px;
+        }
+
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Puppets NFT Admin Dashboard</h1>
 
+        <!-- Wallet Selector Modal -->
+        <div id="walletSelector" class="wallet-selector hidden">
+            <div class="wallet-modal">
+                <h3>Choose Wallet</h3>
+                <div id="walletOptions" class="wallet-options"></div>
+            </div>
+        </div>
 
         <!-- Installation Warning (shown when no wallet detected) -->
         <div id="installWarning" class="install-warning hidden">
@@ -718,6 +799,51 @@
         // Store available wallets globally
         let availableWallets = [];
 
+        // Show wallet selector
+        function showWalletSelector(wallets) {
+            console.log('📋 Showing wallet selector with', wallets.length, 'wallets');
+
+            const selectorDiv = document.getElementById('walletSelector');
+            const optionsDiv = document.getElementById('walletOptions');
+
+            optionsDiv.innerHTML = '';
+
+            const icons = {
+                'Phantom': '👻',
+                'Suiet': '💙',
+                'Slush': '🌊',
+                'Sui Wallet': '💎',
+                'Ethos': '⚡',
+                'Martian': '🚀'
+            };
+
+            wallets.forEach((wallet) => {
+                const option = document.createElement('div');
+                option.className = 'wallet-option';
+                option.innerHTML = `
+                    <div class="wallet-icon">${icons[wallet.name] || '💳'}</div>
+                    <div class="wallet-info">
+                        <div class="wallet-name">${wallet.name}</div>
+                        <div class="wallet-status">Ready</div>
+                    </div>
+                `;
+                option.onclick = async () => {
+                    console.log(`User selected ${wallet.name}`);
+                    selectorDiv.classList.add('hidden');
+                    await connectToWallet(wallet);
+                };
+                optionsDiv.appendChild(option);
+            });
+
+            selectorDiv.classList.remove('hidden');
+
+            // Close on background click
+            selectorDiv.onclick = (e) => {
+                if (e.target === selectorDiv) {
+                    selectorDiv.classList.add('hidden');
+                }
+            };
+        }
 
         // Connect to a specific wallet
         async function connectToWallet(wallet) {
@@ -810,10 +936,8 @@
                 if (wallets && wallets.length > 0) {
                     console.log(`✅ Found ${wallets.length} wallet(s)`);
 
-                    // Connect to first detected wallet
-                    const wallet = wallets[0];
-                    console.log(`🔌 Connecting directly to ${wallet.name}...`);
-                    await connectToWallet(wallet);
+                    // Show wallet selector so user can choose
+                    showWalletSelector(wallets);
 
                 } else {
                     console.error('❌ No Sui Wallet detected');
