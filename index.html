@@ -488,6 +488,25 @@
         console.log('window.phantom?.sui:', window.phantom?.sui);
         console.log('window.suiWallet:', window.suiWallet);
         console.log('window.wallets:', window.wallets);
+
+        // Check if window.wallets has the get method and what it returns
+        if (window.wallets) {
+            console.log('window.wallets type:', typeof window.wallets);
+            console.log('window.wallets keys:', Object.keys(window.wallets));
+            console.log('window.wallets.get type:', typeof window.wallets.get);
+
+            if (typeof window.wallets.get === 'function') {
+                const walletsFromGet = window.wallets.get();
+                console.log('window.wallets.get() returned:', walletsFromGet);
+                console.log('window.wallets.get() length:', walletsFromGet?.length);
+                if (walletsFromGet) {
+                    walletsFromGet.forEach((w, i) => {
+                        console.log(`  Wallet ${i}:`, w.name, w);
+                    });
+                }
+            }
+        }
+
         console.log('window.suiet:', window.suiet);
         console.log('window.slush:', window.slush);
         console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
@@ -617,18 +636,36 @@
             // Method 1: Check for Wallet Standard API (window.wallets)
             if (window.wallets) {
                 console.log('✅ Found window.wallets object');
+                console.log('  Type:', typeof window.wallets);
+                console.log('  Constructor:', window.wallets.constructor?.name);
 
                 // Try get() method
                 if (typeof window.wallets.get === 'function') {
                     try {
                         const standardWallets = window.wallets.get();
                         console.log('💼 window.wallets.get() returned:', standardWallets);
+                        console.log('  Type:', typeof standardWallets);
+                        console.log('  Is array?', Array.isArray(standardWallets));
+                        console.log('  Length:', standardWallets?.length);
 
                         if (standardWallets && standardWallets.length > 0) {
                             for (const wallet of standardWallets) {
                                 console.log(`  ✓ Found ${wallet.name} via Wallet Standard`);
                                 foundWallets.push(wallet);
                                 walletNames.add(wallet.name);
+                            }
+                        } else {
+                            console.log('  ⚠️  No wallets returned from get(), but window.wallets exists');
+                            console.log('  Trying to iterate window.wallets directly...');
+
+                            // Try iterating the wallets object directly
+                            if (typeof window.wallets[Symbol.iterator] === 'function') {
+                                console.log('  window.wallets is iterable!');
+                                for (const wallet of window.wallets) {
+                                    console.log(`    Found wallet via iteration:`, wallet.name);
+                                    foundWallets.push(wallet);
+                                    walletNames.add(wallet.name);
+                                }
                             }
                         }
                     } catch (e) {
