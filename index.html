@@ -834,12 +834,22 @@
 
         // Show wallet selector UI
         function showWalletSelector(wallets) {
+            console.log('📋 showWalletSelector called with:', wallets);
+            console.log('  Number of wallets:', wallets.length);
+
             const selectorDiv = document.getElementById('walletSelector');
             const optionsDiv = document.getElementById('walletOptions');
+
+            if (!wallets || wallets.length === 0) {
+                console.error('❌ No wallets to display!');
+                return;
+            }
 
             optionsDiv.innerHTML = '';
 
             wallets.forEach((wallet, index) => {
+                console.log(`  Creating button for wallet ${index + 1}:`, wallet.name);
+
                 const option = document.createElement('div');
                 option.className = 'wallet-option';
                 option.innerHTML = `
@@ -850,6 +860,7 @@
                     </div>
                 `;
                 option.addEventListener('click', async () => {
+                    console.log(`🖱️ User clicked ${wallet.name}`);
                     // Connect to selected wallet
                     try {
                         selectorDiv.classList.add('hidden');
@@ -862,11 +873,14 @@
                 optionsDiv.appendChild(option);
             });
 
+            console.log(`✅ Created ${wallets.length} wallet buttons`);
             selectorDiv.classList.remove('hidden');
+            console.log('✅ Modal displayed');
 
             // Close on background click
             selectorDiv.onclick = (e) => {
                 if (e.target === selectorDiv) {
+                    console.log('📴 User clicked outside modal, closing...');
                     selectorDiv.classList.add('hidden');
                 }
             };
@@ -950,8 +964,15 @@
                 console.log('📦 Available wallet providers:', walletProviders);
 
                 // Wait for wallets to register (they load async)
+                console.log('⏳ Waiting for wallets...');
                 const wallets = await waitForWallets(3000);
                 availableWallets = wallets;
+
+                console.log('📊 Wallet detection complete:', wallets);
+                console.log('  Total found:', wallets.length);
+                if (wallets.length > 0) {
+                    console.log('  Wallet names:', wallets.map(w => w.name).join(', '));
+                }
 
                 if (wallets && wallets.length > 0) {
                     console.log(`✅ Found ${wallets.length} wallet(s)`);
@@ -959,11 +980,13 @@
                     // If multiple wallets, show selector
                     if (wallets.length > 1) {
                         console.log('🔀 Multiple wallets detected, showing selector...');
+                        console.log('  Wallets being passed to selector:', wallets);
                         showWalletSelector(wallets);
                         return;
                     }
 
                     // Single wallet - connect directly
+                    console.log('  Only 1 wallet, connecting directly to:', wallets[0].name);
                     const wallet = wallets[0];
                     await connectToWallet(wallet);
 
