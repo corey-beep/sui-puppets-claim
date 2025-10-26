@@ -1164,7 +1164,8 @@
                 const optionNone = bcs.option(bcs.u64()).serialize(null).toBytes();
                 console.log('Option::none bytes:', optionNone);
 
-                txb.moveCall({
+                // Call withdraw - returns Coin<SUI>
+                const [coin] = txb.moveCall({
                     target: '0x2::transfer_policy::withdraw',
                     typeArguments: [nftType],
                     arguments: [
@@ -1173,6 +1174,9 @@
                         txb.pure(optionNone) // Option::none - withdraw all
                     ]
                 });
+
+                // Transfer the coin to the sender
+                txb.transferObjects([coin], currentAccount.address);
 
                 console.log('📝 Transaction block built successfully');
 
