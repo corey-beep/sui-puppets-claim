@@ -529,6 +529,63 @@
         console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
         console.log('All window properties with "wallet":', Object.keys(window).filter(k => k.toLowerCase().includes('wallet')));
 
+        // Comprehensive wallet property scanner
+        function scanForWalletProperties() {
+            console.log('\n🔍 COMPREHENSIVE WALLET SCAN:');
+            console.log('='.repeat(60));
+
+            // Check all known wallet property names
+            const knownWalletProps = [
+                'wallets', 'wallet', 'sui', 'suiet', 'slush', 'phantom',
+                'suiWallet', 'suiWallets', 'SuiWallet', 'Sui', 'SUIET', 'SLUSH',
+                'martian', 'ethos', 'ethosWallet', 'glass', 'glassWallet'
+            ];
+
+            console.log('Known wallet properties:');
+            knownWalletProps.forEach(prop => {
+                const value = window[prop];
+                if (value !== undefined) {
+                    console.log(`  ✓ window.${prop}:`, value);
+                    if (typeof value === 'object' && value !== null) {
+                        console.log(`    Keys:`, Object.keys(value).slice(0, 10));
+                    }
+                } else {
+                    console.log(`  ✗ window.${prop}: undefined`);
+                }
+            });
+
+            // Search for any properties that might be wallet-related
+            console.log('\nAll window properties (searching for wallet-related):');
+            const allProps = Object.keys(window);
+            console.log(`  Total properties: ${allProps.length}`);
+
+            const suspiciousProps = allProps.filter(k => {
+                const lower = k.toLowerCase();
+                return lower.includes('wallet') ||
+                       lower.includes('sui') ||
+                       lower.includes('slush') ||
+                       lower.includes('suiet') ||
+                       lower.includes('phantom') ||
+                       lower.includes('web3') ||
+                       lower.includes('ethereum') ||
+                       lower.includes('crypto');
+            });
+
+            console.log(`  Found ${suspiciousProps.length} potentially wallet-related properties:`);
+            suspiciousProps.forEach(prop => {
+                const value = window[prop];
+                console.log(`    • window.${prop}:`, typeof value, value);
+            });
+
+            // Check for wallet standard
+            if (window.addEventListener) {
+                console.log('\n📢 Dispatching wallet-standard:app-ready event...');
+                window.dispatchEvent(new Event('wallet-standard:app-ready'));
+            }
+
+            return suspiciousProps;
+        }
+
         // Re-check after a delay to see if wallets injected late
         setTimeout(() => {
             console.log('\n🔄 Re-checking after 2 seconds...');
@@ -536,6 +593,9 @@
             console.log('window.suiet:', window.suiet);
             console.log('window.slush:', window.slush);
             console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
+
+            // Run comprehensive scan
+            scanForWalletProperties();
         }, 2000);
 
         // Helper to create wallet wrapper for standard interface
