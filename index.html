@@ -450,6 +450,12 @@
             // Check for Phantom Sui support
             if (window.phantom?.sui) {
                 console.log('✅ Found Phantom with Sui support');
+                console.log('🔍 Phantom.sui object:', window.phantom.sui);
+                console.log('🔍 Available methods:', Object.keys(window.phantom.sui));
+                console.log('🔍 typeof connect:', typeof window.phantom.sui.connect);
+                console.log('🔍 typeof requestAccounts:', typeof window.phantom.sui.requestAccounts);
+                console.log('🔍 typeof getAccounts:', typeof window.phantom.sui.getAccounts);
+
                 foundWallets.push({
                     name: 'Phantom',
                     version: '1.0.0',
@@ -459,18 +465,54 @@
                         'standard:connect': {
                             connect: async () => {
                                 console.log('🔌 Connecting to Phantom...');
+                                console.log('Available Phantom methods:', Object.getOwnPropertyNames(window.phantom.sui));
+
                                 try {
-                                    const resp = await window.phantom.sui.connect();
+                                    let resp;
+
+                                    // Try different connection methods
+                                    if (typeof window.phantom.sui.requestAccounts === 'function') {
+                                        console.log('Using requestAccounts()...');
+                                        resp = await window.phantom.sui.requestAccounts();
+                                        console.log('requestAccounts response:', resp);
+                                    } else if (typeof window.phantom.sui.connect === 'function') {
+                                        console.log('Using connect()...');
+                                        resp = await window.phantom.sui.connect();
+                                        console.log('connect response:', resp);
+                                    } else if (typeof window.phantom.sui.getAccounts === 'function') {
+                                        console.log('Using getAccounts()...');
+                                        resp = await window.phantom.sui.getAccounts();
+                                        console.log('getAccounts response:', resp);
+                                    } else {
+                                        throw new Error('No known connection method found on Phantom');
+                                    }
+
                                     console.log('✅ Phantom connected:', resp);
+
+                                    // Handle different response formats
+                                    let address, publicKey;
+                                    if (Array.isArray(resp) && resp.length > 0) {
+                                        // Response is array of accounts
+                                        address = resp[0].address || resp[0];
+                                        publicKey = resp[0].publicKey;
+                                    } else if (resp.address) {
+                                        // Response is single account object
+                                        address = resp.address;
+                                        publicKey = resp.publicKey;
+                                    } else {
+                                        throw new Error('Unknown response format from Phantom: ' + JSON.stringify(resp));
+                                    }
+
                                     return {
                                         accounts: [{
-                                            address: resp.address,
-                                            publicKey: resp.publicKey,
+                                            address: address,
+                                            publicKey: publicKey,
                                             chains: ['sui:mainnet']
                                         }]
                                     };
                                 } catch (err) {
                                     console.error('❌ Phantom connection failed:', err);
+                                    console.error('Error details:', err.message, err.stack);
                                     throw err;
                                 }
                             }
@@ -478,12 +520,16 @@
                         'standard:events': {
                             on: (event, handler) => {
                                 console.log('Registering event handler:', event);
-                                window.phantom.sui.on?.(event, handler);
+                                if (typeof window.phantom.sui.on === 'function') {
+                                    window.phantom.sui.on(event, handler);
+                                }
                             }
                         },
                         'sui:signAndExecuteTransactionBlock': {
                             signAndExecuteTransactionBlock: async ({ transactionBlock, account, chain }) => {
                                 console.log('🔐 Signing transaction with Phantom...');
+                                console.log('Transaction block:', transactionBlock);
+
                                 try {
                                     const result = await window.phantom.sui.signAndExecuteTransactionBlock({
                                         transactionBlock,
