@@ -274,11 +274,59 @@
         .install-btn:hover {
             transform: translateY(-2px);
         }
+
+        .wallet-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .wallet-option {
+            background: #f5f5f5;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .wallet-option:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .wallet-option.selected {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .wallet-icon {
+            font-size: 2rem;
+        }
+
+        .wallet-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Puppets NFT Admin Dashboard</h1>
+
+        <!-- Wallet Selector (shown when multiple wallets detected) -->
+        <div id="walletSelector" class="wallet-selector hidden">
+            <h2 style="margin-bottom: 15px;">Select Your Wallet</h2>
+            <div id="walletOptions"></div>
+        </div>
 
         <!-- Installation Warning (shown when no wallet detected) -->
         <div id="installWarning" class="install-warning hidden">
@@ -569,7 +617,79 @@
             return foundWallets;
         }
 
-        // Connect wallet
+        // Store available wallets globally
+        let availableWallets = [];
+
+        // Show wallet selector UI
+        function showWalletSelector(wallets) {
+            const selectorDiv = document.getElementById('walletSelector');
+            const optionsDiv = document.getElementById('walletOptions');
+
+            optionsDiv.innerHTML = '';
+
+            wallets.forEach((wallet, index) => {
+                const option = document.createElement('div');
+                option.className = 'wallet-option';
+                option.innerHTML = `
+                    <div class="wallet-icon">${wallet.name === 'Phantom' ? '👻' : '💎'}</div>
+                    <div class="wallet-name">${wallet.name}</div>
+                `;
+                option.addEventListener('click', async () => {
+                    optionsDiv.querySelectorAll('.wallet-option').forEach(el => el.classList.remove('selected'));
+                    option.classList.add('selected');
+
+                    // Connect to selected wallet
+                    try {
+                        await connectToWallet(wallet);
+                        selectorDiv.classList.add('hidden');
+                    } catch (err) {
+                        console.error('Error connecting to selected wallet:', err);
+                    }
+                });
+                optionsDiv.appendChild(option);
+            });
+
+            selectorDiv.classList.remove('hidden');
+        }
+
+        // Connect to a specific wallet
+        async function connectToWallet(wallet) {
+            console.log('🔐 Connecting to wallet:', wallet.name);
+            console.log('Wallet object:', wallet);
+
+            currentWallet = wallet;
+
+            // Register wallet events
+            if (wallet.features['standard:events']) {
+                wallet.features['standard:events'].on('change', ({ accounts }) => {
+                    console.log('👛 Wallet accounts changed:', accounts);
+                });
+            }
+
+            // Connect to wallet
+            console.log('🔌 Calling connect()...');
+            const connectResult = await wallet.features['standard:connect'].connect();
+            console.log('✅ Connect result:', connectResult);
+
+            if (connectResult.accounts && connectResult.accounts.length > 0) {
+                currentAccount = connectResult.accounts[0];
+                console.log('✅ Connected account:', currentAccount);
+
+                document.getElementById('connectedAddress').textContent =
+                    currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
+                document.getElementById('walletInfo').classList.remove('hidden');
+                document.getElementById('connectButton').textContent = `Connected (${wallet.name})`;
+                document.getElementById('connectButton').disabled = true;
+                document.getElementById('content').classList.remove('hidden');
+
+                console.log('📊 Loading dashboard data...');
+                await loadData();
+            } else {
+                throw new Error('No accounts returned from wallet');
+            }
+        }
+
+        // Connect wallet button handler
         document.getElementById('connectButton').addEventListener('click', async () => {
             console.log('👆 Connect button clicked');
 
@@ -578,51 +698,30 @@
 
                 // Check all possible wallet APIs
                 const walletProviders = {
+                    phantom: window.phantom,
+                    wallets: window.wallets,
                     suiWallets: window.suiWallets,
-                    suiWallet: window.suiWallet,
-                    sui: window.sui
+                    suiWallet: window.suiWallet
                 };
                 console.log('📦 Available wallet providers:', walletProviders);
 
-                // Try Wallet Standard API first (modern approach)
+                // Get all available wallets
                 const wallets = getWallets();
+                availableWallets = wallets;
 
                 if (wallets && wallets.length > 0) {
-                    console.log('✅ Found wallets via Wallet Standard API');
+                    console.log(`✅ Found ${wallets.length} wallet(s)`);
 
-                    const wallet = wallets[0];
-                    console.log('🔐 Selected wallet:', wallet);
-                    console.log('Wallet name:', wallet.name);
-                    console.log('Wallet version:', wallet.version);
-
-                    currentWallet = wallet;
-
-                    // Register wallet events
-                    wallet.features['standard:events'].on('change', ({ accounts }) => {
-                        console.log('👛 Wallet accounts changed:', accounts);
-                    });
-
-                    // Connect to wallet
-                    console.log('🔌 Connecting to wallet...');
-                    const connectResult = await wallet.features['standard:connect'].connect();
-                    console.log('✅ Connect result:', connectResult);
-
-                    if (connectResult.accounts && connectResult.accounts.length > 0) {
-                        currentAccount = connectResult.accounts[0];
-                        console.log('✅ Connected account:', currentAccount);
-
-                        document.getElementById('connectedAddress').textContent =
-                            currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
-                        document.getElementById('walletInfo').classList.remove('hidden');
-                        document.getElementById('connectButton').textContent = 'Connected';
-                        document.getElementById('connectButton').disabled = true;
-                        document.getElementById('content').classList.remove('hidden');
-
-                        console.log('📊 Loading dashboard data...');
-                        await loadData();
-                    } else {
-                        throw new Error('No accounts returned from wallet');
+                    // If multiple wallets, show selector
+                    if (wallets.length > 1) {
+                        console.log('🔀 Multiple wallets detected, showing selector...');
+                        showWalletSelector(wallets);
+                        return;
                     }
+
+                    // Single wallet - connect directly
+                    const wallet = wallets[0];
+                    await connectToWallet(wallet);
 
                 } else {
                     console.error('❌ No Sui Wallet detected');
