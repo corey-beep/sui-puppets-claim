@@ -507,6 +507,7 @@
         import { getWallets as getMystenWallets } from 'https://esm.sh/@mysten/wallet-standard@0.12.0';
         import { TransactionBlock } from 'https://esm.sh/@mysten/sui.js@0.54.1/transactions';
         import { SuiClient } from 'https://esm.sh/@mysten/sui.js@0.54.1/client';
+        import { bcs } from 'https://esm.sh/@mysten/sui.js@0.54.1/bcs';
 
         console.log('📦 Mysten Wallet Standard loaded');
         console.log('📦 Sui SDK loaded');
@@ -1158,13 +1159,18 @@
                 // Build transaction using Sui TransactionBlock
                 const txb = new TransactionBlock();
 
+                // Encode Option::none for Option<u64>
+                // BCS encoding: Option::none = [0], Option::some(x) = [1, ...bcs(x)]
+                const optionNone = bcs.option(bcs.u64()).serialize(null).toBytes();
+                console.log('Option::none bytes:', optionNone);
+
                 txb.moveCall({
                     target: '0x2::transfer_policy::withdraw',
                     typeArguments: [nftType],
                     arguments: [
                         txb.object(TRANSFER_POLICY_ID),
                         txb.object(TRANSFER_POLICY_CAP_ID),
-                        txb.pure.option('u64', null) // amount (null means withdraw all)
+                        txb.pure(optionNone) // Option::none - withdraw all
                     ]
                 });
 
