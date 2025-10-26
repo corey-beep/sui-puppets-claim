@@ -503,10 +503,12 @@
         // Enable verbose logging
         console.log('🚀 Puppets NFT Admin Dashboard - Initializing...');
 
-        // Import Mysten Wallet Standard
+        // Import Mysten Wallet Standard and Sui SDK
         import { getWallets as getMystenWallets } from 'https://esm.sh/@mysten/wallet-standard@0.12.0';
+        import { TransactionBlock } from 'https://esm.sh/@mysten/sui.js@0.54.1/transactions';
 
         console.log('📦 Mysten Wallet Standard loaded');
+        console.log('📦 Sui SDK loaded');
 
         const PACKAGE_ID = "0xefb46efef2715424b184462c4e3c831456909efe2fbe72b20e4f80e1bd80ce03";
         const NFT_COLLECTION_ID = "0x551188baec211f18e0fb58fa78adfe7ce8eb695bcb545ef2206d7b20a2f373bc";
@@ -1126,24 +1128,20 @@
                 console.log('Current wallet:', currentWallet.name);
                 console.log('Current account:', currentAccount.address);
 
-                // Build transaction using Transaction builder
-                const txb = {
-                    kind: 'moveCall',
-                    data: {
-                        packageObjectId: '0x2',
-                        module: 'transfer_policy',
-                        function: 'withdraw',
-                        typeArguments: [`${PACKAGE_ID}::puppets::PUPPETS_NFT`],
-                        arguments: [
-                            TRANSFER_POLICY_ID,
-                            TRANSFER_POLICY_CAP_ID,
-                            null // amount (null means withdraw all)
-                        ],
-                        gasBudget: 10000000
-                    }
-                };
+                // Build transaction using Sui TransactionBlock
+                const txb = new TransactionBlock();
 
-                console.log('📝 Transaction block:', txb);
+                txb.moveCall({
+                    target: '0x2::transfer_policy::withdraw',
+                    typeArguments: [`${PACKAGE_ID}::puppets::PUPPETS_NFT`],
+                    arguments: [
+                        txb.object(TRANSFER_POLICY_ID),
+                        txb.object(TRANSFER_POLICY_CAP_ID),
+                        txb.pure(null, 'option<u64>') // amount (null means withdraw all)
+                    ]
+                });
+
+                console.log('📝 Transaction block built successfully');
 
                 statusEl.innerHTML = '<div class="note-text">Waiting for wallet approval...</div>';
                 console.log('⏳ Waiting for user approval in wallet...');
