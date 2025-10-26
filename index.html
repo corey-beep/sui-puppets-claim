@@ -506,6 +506,7 @@
         // Import Mysten Wallet Standard and Sui SDK
         import { getWallets as getMystenWallets } from 'https://esm.sh/@mysten/wallet-standard@0.12.0';
         import { TransactionBlock } from 'https://esm.sh/@mysten/sui.js@0.54.1/transactions';
+        import { SuiClient } from 'https://esm.sh/@mysten/sui.js@0.54.1/client';
 
         console.log('📦 Mysten Wallet Standard loaded');
         console.log('📦 Sui SDK loaded');
@@ -515,6 +516,9 @@
         const TRANSFER_POLICY_ID = "0x253c5bf8e47014358e1845305b2e133cc2106e24dce1760a4cb2cedb2e0c8032";
         const TRANSFER_POLICY_CAP_ID = "0xf3f42d23f43919b6deb36af6c67bed6c0e4b29a5c9577843021d2d6e59e21b32";
         const RPC_URL = "https://fullnode.mainnet.sui.io:443";
+
+        // Initialize Sui client
+        const suiClient = new SuiClient({ url: RPC_URL });
 
         console.log('📝 Contract IDs loaded:', {
             PACKAGE_ID,
@@ -1128,16 +1132,39 @@
                 console.log('Current wallet:', currentWallet.name);
                 console.log('Current account:', currentAccount.address);
 
+                // Fetch TransferPolicy to get the correct type
+                statusEl.innerHTML = '<div class="note-text">Fetching policy type...</div>';
+                const policyObject = await suiClient.getObject({
+                    id: TRANSFER_POLICY_ID,
+                    options: { showType: true }
+                });
+
+                console.log('📋 TransferPolicy object:', policyObject);
+
+                // Extract type argument from TransferPolicy<T>
+                const policyType = policyObject.data.type;
+                console.log('Policy type:', policyType);
+
+                // Extract T from "0x2::transfer_policy::TransferPolicy<T>"
+                const typeMatch = policyType.match(/<(.+)>/);
+                if (!typeMatch) {
+                    throw new Error('Could not extract NFT type from TransferPolicy');
+                }
+                const nftType = typeMatch[1];
+                console.log('✅ NFT type:', nftType);
+
+                statusEl.innerHTML = '<div class="note-text">Building transaction...</div>';
+
                 // Build transaction using Sui TransactionBlock
                 const txb = new TransactionBlock();
 
                 txb.moveCall({
                     target: '0x2::transfer_policy::withdraw',
-                    typeArguments: [`${PACKAGE_ID}::puppets::PUPPETS_NFT`],
+                    typeArguments: [nftType],
                     arguments: [
                         txb.object(TRANSFER_POLICY_ID),
                         txb.object(TRANSFER_POLICY_CAP_ID),
-                        txb.pure(null, 'option<u64>') // amount (null means withdraw all)
+                        txb.pure.option('u64', null) // amount (null means withdraw all)
                     ]
                 });
 
