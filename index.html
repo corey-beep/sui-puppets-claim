@@ -981,18 +981,10 @@
                 if (wallets && wallets.length > 0) {
                     console.log(`✅ Found ${wallets.length} wallet(s)`);
 
-                    // If multiple wallets, show selector
-                    if (wallets.length > 1) {
-                        console.log('🔀 Multiple wallets detected, showing selector...');
-                        console.log('  Wallets being passed to selector:', wallets);
-                        showWalletSelector(wallets);
-                        return;
-                    }
-
-                    // Single wallet - connect directly
-                    console.log('  Only 1 wallet, connecting directly to:', wallets[0].name);
-                    const wallet = wallets[0];
-                    await connectToWallet(wallet);
+                    // Always show selector so user can see what's detected and choose
+                    console.log('📋 Showing wallet selector...');
+                    console.log('  Wallets being passed to selector:', wallets);
+                    showWalletSelector(wallets);
 
                 } else {
                     console.error('❌ No Sui Wallet detected');
