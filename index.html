@@ -283,18 +283,37 @@
         <!-- Installation Warning (shown when no wallet detected) -->
         <div id="installWarning" class="install-warning hidden">
             <h2>⚠️ Sui Wallet Not Detected</h2>
-            <p>To use this dashboard, you need to install the Sui Wallet browser extension:</p>
+            <p><strong>Already installed Sui Wallet?</strong> Try these steps:</p>
             <ol>
-                <li>Click the button below to install Sui Wallet</li>
-                <li>After installation, <strong>refresh this page</strong></li>
-                <li>Click "Connect Sui Wallet" to continue</li>
+                <li><strong>Check if extension is enabled:</strong>
+                    <ul style="margin-top: 5px; margin-left: 20px;">
+                        <li>Go to <code>chrome://extensions</code> (or your browser's extensions page)</li>
+                        <li>Find "Sui Wallet" and make sure it's <strong>toggled ON</strong></li>
+                    </ul>
+                </li>
+                <li><strong>Refresh this page</strong> (Ctrl+Shift+R or Cmd+Shift+R)</li>
+                <li>Or click the button below to check again</li>
             </ol>
+            <button id="refreshWalletBtn" class="install-btn" style="background: #4CAF50; color: white; margin-bottom: 10px;">
+                🔄 Check for Wallet Again
+            </button>
+            <p style="margin: 15px 0 10px 0;"><strong>Don't have Sui Wallet yet?</strong></p>
             <a href="https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank">
                 <button class="install-btn">📥 Install Sui Wallet Extension</button>
             </a>
             <p style="margin-top: 15px; font-size: 0.9rem; opacity: 0.9;">
-                Works with Chrome, Brave, Edge, and other Chromium browsers
+                ✅ Works with Chrome, Brave, Edge, and other Chromium browsers
             </p>
+            <details style="margin-top: 15px; background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
+                <summary style="cursor: pointer; font-weight: bold;">🔧 Advanced Troubleshooting</summary>
+                <ul style="margin-top: 10px; line-height: 1.8;">
+                    <li>Make sure you installed <strong>Sui Wallet</strong> (not Suiet or another wallet)</li>
+                    <li>Try disabling other wallet extensions temporarily</li>
+                    <li>Restart your browser completely</li>
+                    <li>Clear browser cache and reload</li>
+                    <li>Check browser console (F12) for errors</li>
+                </ul>
+            </details>
         </div>
 
         <div class="wallet-connect">
@@ -761,6 +780,49 @@
         // Claim button handler
         console.log('🔘 Setting up claim button handler...');
         document.getElementById('claimButton').addEventListener('click', claimRoyalties);
+
+        // Refresh wallet detection handler
+        document.getElementById('refreshWalletBtn').addEventListener('click', () => {
+            console.log('🔄 Manual wallet refresh requested');
+
+            const btn = document.getElementById('refreshWalletBtn');
+            btn.disabled = true;
+            btn.textContent = '🔍 Checking...';
+
+            setTimeout(() => {
+                console.log('🔍 Re-checking for wallets...');
+                console.log('window.suiWallets:', window.suiWallets);
+                console.log('window.suiWallet:', window.suiWallet);
+                console.log('window.sui:', window.sui);
+
+                const wallets = getWallets();
+
+                if (wallets.length > 0) {
+                    console.log('✅ Wallet detected!');
+                    alert('✅ Sui Wallet Detected!\n\nWallet found: ' + wallets[0].name + '\n\nRefreshing page...');
+                    location.reload();
+                } else {
+                    console.error('❌ Still no wallet detected');
+
+                    let message = '❌ Still No Wallet Detected\n\n';
+                    message += 'Diagnostic Info:\n';
+                    message += '- window.suiWallets: ' + (typeof window.suiWallets) + '\n';
+                    message += '- window.suiWallet: ' + (typeof window.suiWallet) + '\n';
+                    message += '- window.sui: ' + (typeof window.sui) + '\n\n';
+                    message += 'Please try:\n';
+                    message += '1. Go to chrome://extensions\n';
+                    message += '2. Find "Sui Wallet"\n';
+                    message += '3. Make sure it\'s ENABLED (toggle ON)\n';
+                    message += '4. Restart your browser\n';
+                    message += '5. Come back to this page';
+
+                    alert(message);
+
+                    btn.disabled = false;
+                    btn.textContent = '🔄 Check for Wallet Again';
+                }
+            }, 500);
+        });
 
         // Auto-detect Sui Wallet on page load
         window.addEventListener('load', () => {
