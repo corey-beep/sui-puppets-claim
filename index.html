@@ -328,7 +328,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mysten/sui.js@0.54.1/dist/index.global.min.js"></script>
     <script type="module">
         // Enable verbose logging
         console.log('🚀 Puppets NFT Admin Dashboard - Initializing...');
@@ -347,12 +346,30 @@
         });
 
         let currentAccount = null;
+        let currentWallet = null;
         let royaltyBalance = 0;
 
         // Detect wallet on page load
         console.log('🔍 Checking for Sui Wallet...');
         console.log('window.suiWallet:', window.suiWallet);
+        console.log('window.suiWallets:', window.suiWallets);
         console.log('All window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
+
+        // Helper function to get available wallets
+        function getWallets() {
+            console.log('🔍 Getting available wallets...');
+
+            // Modern Wallet Standard API
+            if (window.suiWallets && window.suiWallets.get) {
+                console.log('✅ Using Wallet Standard API (window.suiWallets)');
+                const wallets = window.suiWallets.get();
+                console.log('💼 Available wallets:', wallets);
+                return wallets;
+            }
+
+            console.warn('⚠️ Wallet Standard API not found');
+            return [];
+        }
 
         // Connect wallet
         document.getElementById('connectButton').addEventListener('click', async () => {
@@ -360,35 +377,41 @@
 
             try {
                 console.log('🔍 Checking wallet availability...');
-                console.log('window.suiWallet:', window.suiWallet);
 
-                // Check for different wallet providers
+                // Check all possible wallet APIs
                 const walletProviders = {
+                    suiWallets: window.suiWallets,
                     suiWallet: window.suiWallet,
-                    sui: window.sui,
-                    wallet: window.wallet
+                    sui: window.sui
                 };
                 console.log('📦 Available wallet providers:', walletProviders);
 
-                // Try to detect Sui Wallet Standard API
-                if (window.sui && window.sui.wallet) {
-                    console.log('✅ Found Sui Wallet Standard API');
-                    try {
-                        const wallets = await window.sui.wallet.getWallets();
-                        console.log('💼 Available wallets:', wallets);
+                // Try Wallet Standard API first (modern approach)
+                const wallets = getWallets();
 
-                        if (wallets.length === 0) {
-                            alert('No Sui wallets detected. Please install Sui Wallet extension.');
-                            return;
-                        }
+                if (wallets && wallets.length > 0) {
+                    console.log('✅ Found wallets via Wallet Standard API');
 
-                        const wallet = wallets[0];
-                        console.log('🔐 Connecting to wallet:', wallet.name);
+                    const wallet = wallets[0];
+                    console.log('🔐 Selected wallet:', wallet);
+                    console.log('Wallet name:', wallet.name);
+                    console.log('Wallet version:', wallet.version);
 
-                        const account = await wallet.connect();
-                        console.log('✅ Connected account:', account);
+                    currentWallet = wallet;
 
-                        currentAccount = account;
+                    // Register wallet events
+                    wallet.features['standard:events'].on('change', ({ accounts }) => {
+                        console.log('👛 Wallet accounts changed:', accounts);
+                    });
+
+                    // Connect to wallet
+                    console.log('🔌 Connecting to wallet...');
+                    const connectResult = await wallet.features['standard:connect'].connect();
+                    console.log('✅ Connect result:', connectResult);
+
+                    if (connectResult.accounts && connectResult.accounts.length > 0) {
+                        currentAccount = connectResult.accounts[0];
+                        console.log('✅ Connected account:', currentAccount);
 
                         document.getElementById('connectedAddress').textContent =
                             currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
@@ -399,49 +422,28 @@
 
                         console.log('📊 Loading dashboard data...');
                         await loadData();
-
-                    } catch (walletError) {
-                        console.error('❌ Wallet Standard API error:', walletError);
-                        throw walletError;
-                    }
-                } else if (window.suiWallet) {
-                    console.log('✅ Found legacy suiWallet API');
-
-                    const accounts = await window.suiWallet.getAccounts();
-                    console.log('📋 Existing accounts:', accounts);
-
-                    if (accounts.length === 0) {
-                        console.log('🔑 Requesting permissions...');
-                        await window.suiWallet.requestPermissions();
-                        const newAccounts = await window.suiWallet.getAccounts();
-                        console.log('📋 New accounts after permission:', newAccounts);
-                        currentAccount = newAccounts[0];
                     } else {
-                        currentAccount = accounts[0];
+                        throw new Error('No accounts returned from wallet');
                     }
 
-                    console.log('✅ Connected account:', currentAccount);
-
-                    document.getElementById('connectedAddress').textContent =
-                        currentAccount.address.slice(0, 6) + '...' + currentAccount.address.slice(-4);
-                    document.getElementById('walletInfo').classList.remove('hidden');
-                    document.getElementById('connectButton').textContent = 'Connected';
-                    document.getElementById('connectButton').disabled = true;
-                    document.getElementById('content').classList.remove('hidden');
-
-                    console.log('📊 Loading dashboard data...');
-                    await loadData();
                 } else {
                     console.error('❌ No Sui Wallet detected');
                     console.log('Please install Sui Wallet extension from:');
-                    console.log('https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
-                    alert('Please install Sui Wallet extension.\n\nChrome: https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
+                    console.log('https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
+
+                    alert('⚠️ No Sui Wallet Detected\n\nPlease:\n1. Install Sui Wallet extension\n2. Refresh this page\n\nDownload: https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil');
                     return;
                 }
             } catch (error) {
                 console.error('❌ Wallet connection error:', error);
                 console.error('Error stack:', error.stack);
-                alert('Failed to connect wallet: ' + error.message + '\n\nCheck console for details (F12)');
+
+                let errorMsg = error.message;
+                if (error.message.includes('User rejected')) {
+                    errorMsg = 'You rejected the connection request';
+                }
+
+                alert('Failed to connect wallet: ' + errorMsg + '\n\nCheck console for details (F12)');
             }
         });
 
@@ -581,6 +583,10 @@
         async function claimRoyalties() {
             console.log('💸 Starting royalty claim process...');
             try {
+                if (!currentWallet || !currentAccount) {
+                    throw new Error('Wallet not connected');
+                }
+
                 document.getElementById('claimButton').disabled = true;
                 document.getElementById('claimButton').textContent = 'Processing...';
 
@@ -589,10 +595,12 @@
                 statusEl.innerHTML = '<div class="note-text">Building transaction...</div>';
                 statusEl.classList.remove('hidden');
 
-                console.log('🔨 Building transaction...');
+                console.log('🔨 Building transaction block...');
+                console.log('Current wallet:', currentWallet.name);
+                console.log('Current account:', currentAccount.address);
 
-                // Build the transaction
-                const tx = {
+                // Build transaction using Transaction builder
+                const txb = {
                     kind: 'moveCall',
                     data: {
                         packageObjectId: '0x2',
@@ -608,22 +616,34 @@
                     }
                 };
 
-                console.log('📝 Transaction details:', tx);
+                console.log('📝 Transaction block:', txb);
 
                 statusEl.innerHTML = '<div class="note-text">Waiting for wallet approval...</div>';
                 console.log('⏳ Waiting for user approval in wallet...');
 
-                // Execute transaction
-                const result = await window.suiWallet.executeMoveCall(tx);
+                // Sign and execute transaction using Wallet Standard API
+                const signAndExecuteFeature = currentWallet.features['sui:signAndExecuteTransactionBlock'];
+
+                if (!signAndExecuteFeature) {
+                    throw new Error('Wallet does not support transaction signing');
+                }
+
+                console.log('🔐 Signing and executing transaction...');
+
+                const result = await signAndExecuteFeature.signAndExecuteTransactionBlock({
+                    transactionBlock: txb,
+                    account: currentAccount,
+                    chain: 'sui:mainnet'
+                });
 
                 console.log('✅ Transaction result:', result);
 
                 statusEl.className = 'success';
                 statusEl.innerHTML = `
                     <div style="font-weight: bold; margin-bottom: 5px;">✅ Royalties Claimed Successfully!</div>
-                    <div>Transaction: <a href="https://suiscan.xyz/mainnet/tx/${result.txDigest}"
+                    <div>Transaction: <a href="https://suiscan.xyz/mainnet/tx/${result.digest}"
                          target="_blank" style="color: #155724; text-decoration: underline;">
-                        ${result.txDigest.slice(0, 10)}...${result.txDigest.slice(-8)}
+                        ${result.digest.slice(0, 10)}...${result.digest.slice(-8)}
                     </a></div>
                 `;
 
@@ -636,9 +656,15 @@
             } catch (error) {
                 console.error('❌ Error claiming royalties:', error);
                 console.error('Error stack:', error.stack);
+
+                let errorMsg = error.message;
+                if (error.message.includes('User rejected')) {
+                    errorMsg = 'You rejected the transaction';
+                }
+
                 const statusEl = document.getElementById('claimStatus');
                 statusEl.className = 'error';
-                statusEl.innerHTML = `Failed to claim: ${error.message}`;
+                statusEl.innerHTML = `Failed to claim: ${errorMsg}`;
 
                 document.getElementById('claimButton').disabled = false;
                 document.getElementById('claimButton').textContent = 'Claim Royalties';
@@ -665,25 +691,34 @@
         // Auto-detect Sui Wallet on page load
         window.addEventListener('load', () => {
             console.log('🌍 Window loaded, checking for Sui Wallet...');
+            console.log('window.suiWallets:', window.suiWallets);
             console.log('window.suiWallet:', window.suiWallet);
             console.log('window.sui:', window.sui);
 
             // Give wallet extensions time to inject
             setTimeout(() => {
-                console.log('⏰ Delayed wallet check (after 500ms)...');
+                console.log('⏰ Delayed wallet check (after 1000ms)...');
+                console.log('window.suiWallets:', window.suiWallets);
                 console.log('window.suiWallet:', window.suiWallet);
                 console.log('window.sui:', window.sui);
 
-                const hasWallet = window.suiWallet || (window.sui && window.sui.wallet);
+                // Check for Wallet Standard API
+                const wallets = getWallets();
+                const hasWallet = wallets.length > 0;
 
                 if (!hasWallet) {
                     console.warn('⚠️ No Sui Wallet detected on page load');
+                    console.log('Debug info:');
+                    console.log('- typeof window.suiWallets:', typeof window.suiWallets);
+                    console.log('- window.suiWallets?.get:', window.suiWallets?.get);
+
                     document.querySelector('.wallet-connect').innerHTML +=
-                        '<p style="color: #dc3545; margin-top: 15px;">⚠️ No Sui Wallet detected. Please install <a href="https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank">Sui Wallet extension</a> and refresh the page.</p>';
+                        '<p style="color: #dc3545; margin-top: 15px; font-size: 0.9rem;">⚠️ No Sui Wallet detected.<br>Please install <a href="https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil" target="_blank" style="color: #dc3545; font-weight: bold;">Sui Wallet extension</a> and refresh this page.</p>';
                 } else {
                     console.log('✅ Sui Wallet detected on page load');
+                    console.log(`Found ${wallets.length} wallet(s):`, wallets.map(w => w.name));
                 }
-            }, 500);
+            }, 1000); // Increased to 1 second to give more time for extension to load
         });
 
         console.log('✅ Dashboard initialization complete');
