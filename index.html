@@ -500,9 +500,9 @@
                 console.log('✅ Found Phantom with Sui support');
                 console.log('🔍 Phantom.sui object:', window.phantom.sui);
                 console.log('🔍 Available methods:', Object.keys(window.phantom.sui));
-                console.log('🔍 typeof connect:', typeof window.phantom.sui.connect);
-                console.log('🔍 typeof requestAccounts:', typeof window.phantom.sui.requestAccounts);
-                console.log('🔍 typeof getAccounts:', typeof window.phantom.sui.getAccounts);
+                console.log('🔍 typeof requestAccount:', typeof window.phantom.sui.requestAccount);
+                console.log('🔍 typeof signAndExecuteTransaction:', typeof window.phantom.sui.signAndExecuteTransaction);
+                console.log('🔍 typeof signTransaction:', typeof window.phantom.sui.signTransaction);
 
                 foundWallets.push({
                     name: 'Phantom',
@@ -518,8 +518,12 @@
                                 try {
                                     let resp;
 
-                                    // Try different connection methods
-                                    if (typeof window.phantom.sui.requestAccounts === 'function') {
+                                    // Phantom uses requestAccount (singular!)
+                                    if (typeof window.phantom.sui.requestAccount === 'function') {
+                                        console.log('✅ Using requestAccount() (Phantom API)...');
+                                        resp = await window.phantom.sui.requestAccount();
+                                        console.log('requestAccount response:', resp);
+                                    } else if (typeof window.phantom.sui.requestAccounts === 'function') {
                                         console.log('Using requestAccounts()...');
                                         resp = await window.phantom.sui.requestAccounts();
                                         console.log('requestAccounts response:', resp);
@@ -579,8 +583,9 @@
                                 console.log('Transaction block:', transactionBlock);
 
                                 try {
-                                    const result = await window.phantom.sui.signAndExecuteTransactionBlock({
-                                        transactionBlock,
+                                    // Phantom uses signAndExecuteTransaction (not signAndExecuteTransactionBlock)
+                                    const result = await window.phantom.sui.signAndExecuteTransaction({
+                                        transaction: transactionBlock,
                                         options: {
                                             showEffects: true,
                                             showObjectChanges: true
