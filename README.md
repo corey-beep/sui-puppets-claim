@@ -46,6 +46,8 @@ open index.html
 ## Requirements
 
 - **Sui Wallet** browser extension ([Install](https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil))
+  - **OR** [Phantom Wallet](https://phantom.app/) with Sui support enabled
+  - **OR** any Wallet Standard compatible Sui wallet
 - **Admin Wallet** with TransferPolicyCap ownership
 - **Browser** (Chrome, Firefox, or Brave recommended)
 
@@ -123,18 +125,31 @@ public fun withdraw<T>(
 
 ### Connect button does nothing / No wallet detected
 
-**Solution:**
+**Supported Wallets:**
+- [Sui Wallet](https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil) - Official Sui wallet
+- [Phantom Wallet](https://phantom.app/) - Multi-chain wallet with Sui support
+- Any Wallet Standard compatible Sui wallet
+
+**Using Phantom Wallet:**
+1. Install [Phantom](https://phantom.app/) extension
+2. Open Phantom settings
+3. Enable **Sui** in the supported chains
+4. Refresh the dashboard page
+5. Click "Connect Phantom Wallet"
+
+**Using Sui Wallet:**
 1. Install the [Sui Wallet extension](https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil)
 2. Make sure the extension is **enabled** in your browser
 3. **Refresh the page** after installing
 4. Open browser console (F12) and check for logs
-5. Look for `window.suiWallets:` in console - should not be `undefined`
+5. Look for `window.phantom:` or `window.wallets:` in console - should not be `undefined`
 
 **Still not working?**
 - Try a different browser (Chrome, Brave, or Edge)
 - Disable other wallet extensions temporarily
 - Check console for error messages
-- Make sure you're using the latest Sui Wallet version
+- Make sure you're using the latest wallet version
+- For Phantom, verify Sui chain is enabled in settings
 
 ### "Permission Required" message
 - You need to connect with the wallet that owns the TransferPolicyCap
