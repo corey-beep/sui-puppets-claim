@@ -465,6 +465,11 @@
         // Enable verbose logging
         console.log('🚀 Puppets NFT Admin Dashboard - Initializing...');
 
+        // Import Mysten Wallet Standard
+        import { getWallets as getMystenWallets } from 'https://esm.sh/@mysten/wallet-standard@0.12.0';
+
+        console.log('📦 Mysten Wallet Standard loaded');
+
         const PACKAGE_ID = "0xefb46efef2715424b184462c4e3c831456909efe2fbe72b20e4f80e1bd80ce03";
         const NFT_COLLECTION_ID = "0x551188baec211f18e0fb58fa78adfe7ce8eb695bcb545ef2206d7b20a2f373bc";
         const TRANSFER_POLICY_ID = "0x253c5bf8e47014358e1845305b2e133cc2106e24dce1760a4cb2cedb2e0c8032";
@@ -713,91 +718,43 @@
             };
         }
 
-        // Helper function to get available wallets
+        // Helper function to get available wallets using Mysten Wallet Standard
         function getWallets() {
-            console.log('🔍 Getting available wallets...');
-            const foundWallets = [];
-            const walletNames = new Set(); // Track wallet names to avoid duplicates
+            console.log('🔍 Getting available wallets using Mysten Wallet Standard...');
 
-            // Method 1: Check for Wallet Standard API (window.wallets)
-            if (window.wallets) {
-                console.log('✅ Found window.wallets object');
-                console.log('  Type:', typeof window.wallets);
-                console.log('  Constructor:', window.wallets.constructor?.name);
+            try {
+                const walletsApi = getMystenWallets();
+                console.log('📦 Wallets API:', walletsApi);
 
-                // Try get() method
-                if (typeof window.wallets.get === 'function') {
-                    try {
-                        const standardWallets = window.wallets.get();
-                        console.log('💼 window.wallets.get() returned:', standardWallets);
-                        console.log('  Type:', typeof standardWallets);
-                        console.log('  Is array?', Array.isArray(standardWallets));
-                        console.log('  Length:', standardWallets?.length);
+                // Get registered wallets
+                const registeredWallets = walletsApi.get();
+                console.log('💼 Registered wallets:', registeredWallets);
+                console.log(`📊 Total wallets found: ${registeredWallets.length}`);
 
-                        if (standardWallets && standardWallets.length > 0) {
-                            for (const wallet of standardWallets) {
-                                console.log(`  ✓ Found ${wallet.name} via Wallet Standard`);
-                                foundWallets.push(wallet);
-                                walletNames.add(wallet.name);
-                            }
-                        } else {
-                            console.log('  ⚠️  No wallets returned from get(), but window.wallets exists');
-                            console.log('  Trying to iterate window.wallets directly...');
+                registeredWallets.forEach((w, i) => {
+                    console.log(`  ${i + 1}. ${w.name} (v${w.version})`);
+                    console.log(`     Chains: ${w.chains.join(', ')}`);
+                    console.log(`     Features: ${Object.keys(w.features).join(', ')}`);
+                });
 
-                            // Try iterating the wallets object directly
-                            if (typeof window.wallets[Symbol.iterator] === 'function') {
-                                console.log('  window.wallets is iterable!');
-                                for (const wallet of window.wallets) {
-                                    console.log(`    Found wallet via iteration:`, wallet.name);
-                                    foundWallets.push(wallet);
-                                    walletNames.add(wallet.name);
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.log('  ⚠️  Error calling window.wallets.get():', e);
-                    }
+                // Listen for new wallets
+                walletsApi.on('register', (wallet) => {
+                    console.log('  📢 New wallet registered:', wallet.name);
+                });
+
+                return registeredWallets;
+            } catch (error) {
+                console.error('❌ Error getting wallets from Mysten Wallet Standard:', error);
+                console.log('Falling back to Phantom-only detection...');
+
+                // Fallback: manual Phantom detection
+                if (window.phantom?.sui) {
+                    console.log('✅ Found Phantom via fallback');
+                    return [createWalletWrapper('Phantom', window.phantom.sui)];
                 }
 
-                // Try on() method to listen for wallet registration
-                if (typeof window.wallets.on === 'function') {
-                    console.log('  Found window.wallets.on() - setting up listener');
-                    window.wallets.on('register', (wallet) => {
-                        console.log('  📢 New wallet registered:', wallet.name);
-                    });
-                }
-            } else {
-                console.log('⚠️  window.wallets not found');
+                return [];
             }
-
-            // Method 2: Check for individual wallet objects
-            const individualWallets = [
-                { key: 'suiet', name: 'Suiet' },
-                { key: 'slush', name: 'Slush' },
-                { key: 'suiWallet', name: 'Sui Wallet' },
-                { key: 'ethos', name: 'Ethos' },
-                { key: 'martian', name: 'Martian' }
-            ];
-
-            for (const { key, name } of individualWallets) {
-                if (window[key] && !walletNames.has(name)) {
-                    console.log(`✅ Found window.${key} (${name})`);
-                    foundWallets.push(createWalletWrapper(name, window[key]));
-                    walletNames.add(name);
-                }
-            }
-
-            // Method 3: Check for Phantom Sui support
-            if (window.phantom?.sui && !walletNames.has('Phantom')) {
-                console.log('✅ Found window.phantom.sui (Phantom)');
-                foundWallets.push(createWalletWrapper('Phantom', window.phantom.sui));
-                walletNames.add('Phantom');
-            }
-
-            console.log(`\n📊 Total wallets found: ${foundWallets.length}`);
-            foundWallets.forEach((w, i) => console.log(`  ${i + 1}. ${w.name}`));
-
-            return foundWallets;
         }
 
         // Store available wallets globally
