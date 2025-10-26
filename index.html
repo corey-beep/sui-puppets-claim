@@ -488,7 +488,125 @@
         console.log('window.phantom?.sui:', window.phantom?.sui);
         console.log('window.suiWallet:', window.suiWallet);
         console.log('window.wallets:', window.wallets);
+        console.log('window.suiet:', window.suiet);
+        console.log('window.slush:', window.slush);
+        console.log('All window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui')));
         console.log('All window properties with "wallet":', Object.keys(window).filter(k => k.toLowerCase().includes('wallet')));
+
+        // Helper to create wallet wrapper for standard interface
+        function createWalletWrapper(name, walletApi) {
+            console.log(`🔧 Creating wrapper for ${name}`);
+            console.log(`  Available methods:`, Object.keys(walletApi));
+
+            return {
+                name: name,
+                version: '1.0.0',
+                icon: '',
+                chains: ['sui:mainnet'],
+                features: {
+                    'standard:connect': {
+                        connect: async () => {
+                            console.log(`🔌 Connecting to ${name}...`);
+
+                            try {
+                                let resp;
+
+                                // Try different connection methods
+                                if (typeof walletApi.connect === 'function') {
+                                    console.log(`  Using connect() for ${name}`);
+                                    resp = await walletApi.connect();
+                                } else if (typeof walletApi.requestAccount === 'function') {
+                                    console.log(`  Using requestAccount() for ${name}`);
+                                    resp = await walletApi.requestAccount();
+                                } else if (typeof walletApi.requestAccounts === 'function') {
+                                    console.log(`  Using requestAccounts() for ${name}`);
+                                    resp = await walletApi.requestAccounts();
+                                } else if (typeof walletApi.getAccounts === 'function') {
+                                    console.log(`  Using getAccounts() for ${name}`);
+                                    resp = await walletApi.getAccounts();
+                                } else {
+                                    throw new Error(`No known connection method found on ${name}`);
+                                }
+
+                                console.log(`✅ ${name} connected:`, resp);
+
+                                // Handle different response formats
+                                let address, publicKey;
+                                if (Array.isArray(resp) && resp.length > 0) {
+                                    address = resp[0].address || resp[0];
+                                    publicKey = resp[0].publicKey;
+                                } else if (resp.address) {
+                                    address = resp.address;
+                                    publicKey = resp.publicKey;
+                                } else if (resp.accounts && resp.accounts.length > 0) {
+                                    address = resp.accounts[0].address;
+                                    publicKey = resp.accounts[0].publicKey;
+                                } else {
+                                    throw new Error(`Unknown response format from ${name}: ` + JSON.stringify(resp));
+                                }
+
+                                return {
+                                    accounts: [{
+                                        address: address,
+                                        publicKey: publicKey,
+                                        chains: ['sui:mainnet']
+                                    }]
+                                };
+                            } catch (err) {
+                                console.error(`❌ ${name} connection failed:`, err);
+                                throw err;
+                            }
+                        }
+                    },
+                    'standard:events': {
+                        on: (event, handler) => {
+                            if (typeof walletApi.on === 'function') {
+                                walletApi.on(event, handler);
+                            }
+                        }
+                    },
+                    'sui:signAndExecuteTransactionBlock': {
+                        signAndExecuteTransactionBlock: async ({ transactionBlock, account, chain }) => {
+                            console.log(`🔐 Signing transaction with ${name}...`);
+
+                            try {
+                                let result;
+
+                                // Try different signing methods
+                                if (typeof walletApi.signAndExecuteTransactionBlock === 'function') {
+                                    console.log(`  Using signAndExecuteTransactionBlock() for ${name}`);
+                                    result = await walletApi.signAndExecuteTransactionBlock({
+                                        transactionBlock: transactionBlock,
+                                        options: {
+                                            showEffects: true,
+                                            showObjectChanges: true
+                                        }
+                                    });
+                                } else if (typeof walletApi.signAndExecuteTransaction === 'function') {
+                                    console.log(`  Using signAndExecuteTransaction() for ${name}`);
+                                    result = await walletApi.signAndExecuteTransaction({
+                                        transaction: transactionBlock,
+                                        options: {
+                                            showEffects: true,
+                                            showObjectChanges: true
+                                        }
+                                    });
+                                } else {
+                                    throw new Error(`No known signing method found on ${name}`);
+                                }
+
+                                console.log(`✅ Transaction signed with ${name}:`, result);
+                                return result;
+                            } catch (err) {
+                                console.error(`❌ Transaction signing failed with ${name}:`, err);
+                                throw err;
+                            }
+                        }
+                    }
+                },
+                _walletApi: walletApi // Store reference
+            };
+        }
 
         // Helper function to get available wallets
         function getWallets() {
@@ -496,118 +614,66 @@
             const foundWallets = [];
             const walletNames = new Set(); // Track wallet names to avoid duplicates
 
-            // Check for Wallet Standard API FIRST (Suiet, Slush, and standards-compliant wallets)
-            if (window.wallets && typeof window.wallets.get === 'function') {
-                console.log('✅ Found Wallet Standard API (window.wallets)');
-                const standardWallets = window.wallets.get();
-                console.log('💼 Standard wallets:', standardWallets);
+            // Method 1: Check for Wallet Standard API (window.wallets)
+            if (window.wallets) {
+                console.log('✅ Found window.wallets object');
 
-                for (const wallet of standardWallets) {
-                    console.log(`  - ${wallet.name} (Standard API)`);
-                    foundWallets.push(wallet);
-                    walletNames.add(wallet.name);
+                // Try get() method
+                if (typeof window.wallets.get === 'function') {
+                    try {
+                        const standardWallets = window.wallets.get();
+                        console.log('💼 window.wallets.get() returned:', standardWallets);
+
+                        if (standardWallets && standardWallets.length > 0) {
+                            for (const wallet of standardWallets) {
+                                console.log(`  ✓ Found ${wallet.name} via Wallet Standard`);
+                                foundWallets.push(wallet);
+                                walletNames.add(wallet.name);
+                            }
+                        }
+                    } catch (e) {
+                        console.log('  ⚠️  Error calling window.wallets.get():', e);
+                    }
+                }
+
+                // Try on() method to listen for wallet registration
+                if (typeof window.wallets.on === 'function') {
+                    console.log('  Found window.wallets.on() - setting up listener');
+                    window.wallets.on('register', (wallet) => {
+                        console.log('  📢 New wallet registered:', wallet.name);
+                    });
+                }
+            } else {
+                console.log('⚠️  window.wallets not found');
+            }
+
+            // Method 2: Check for individual wallet objects
+            const individualWallets = [
+                { key: 'suiet', name: 'Suiet' },
+                { key: 'slush', name: 'Slush' },
+                { key: 'suiWallet', name: 'Sui Wallet' },
+                { key: 'ethos', name: 'Ethos' },
+                { key: 'martian', name: 'Martian' }
+            ];
+
+            for (const { key, name } of individualWallets) {
+                if (window[key] && !walletNames.has(name)) {
+                    console.log(`✅ Found window.${key} (${name})`);
+                    foundWallets.push(createWalletWrapper(name, window[key]));
+                    walletNames.add(name);
                 }
             }
 
-            // Check for Phantom Sui support (only if not already in standard wallets)
+            // Method 3: Check for Phantom Sui support
             if (window.phantom?.sui && !walletNames.has('Phantom')) {
-                console.log('✅ Found Phantom with Sui support (using custom wrapper)');
-                console.log('🔍 Phantom.sui object:', window.phantom.sui);
-                console.log('🔍 Available methods:', Object.keys(window.phantom.sui));
-
-                foundWallets.push({
-                    name: 'Phantom',
-                    version: '1.0.0',
-                    icon: '',
-                    chains: ['sui:mainnet'],
-                    features: {
-                        'standard:connect': {
-                            connect: async () => {
-                                console.log('🔌 Connecting to Phantom...');
-
-                                try {
-                                    let resp;
-
-                                    // Phantom uses requestAccount (singular!)
-                                    if (typeof window.phantom.sui.requestAccount === 'function') {
-                                        console.log('✅ Using requestAccount() (Phantom API)...');
-                                        resp = await window.phantom.sui.requestAccount();
-                                        console.log('requestAccount response:', resp);
-                                    } else if (typeof window.phantom.sui.requestAccounts === 'function') {
-                                        console.log('Using requestAccounts()...');
-                                        resp = await window.phantom.sui.requestAccounts();
-                                    } else if (typeof window.phantom.sui.connect === 'function') {
-                                        console.log('Using connect()...');
-                                        resp = await window.phantom.sui.connect();
-                                    } else {
-                                        throw new Error('No known connection method found on Phantom');
-                                    }
-
-                                    console.log('✅ Phantom connected:', resp);
-
-                                    // Handle different response formats
-                                    let address, publicKey;
-                                    if (Array.isArray(resp) && resp.length > 0) {
-                                        address = resp[0].address || resp[0];
-                                        publicKey = resp[0].publicKey;
-                                    } else if (resp.address) {
-                                        address = resp.address;
-                                        publicKey = resp.publicKey;
-                                    } else {
-                                        throw new Error('Unknown response format from Phantom: ' + JSON.stringify(resp));
-                                    }
-
-                                    return {
-                                        accounts: [{
-                                            address: address,
-                                            publicKey: publicKey,
-                                            chains: ['sui:mainnet']
-                                        }]
-                                    };
-                                } catch (err) {
-                                    console.error('❌ Phantom connection failed:', err);
-                                    throw err;
-                                }
-                            }
-                        },
-                        'standard:events': {
-                            on: (event, handler) => {
-                                if (typeof window.phantom.sui.on === 'function') {
-                                    window.phantom.sui.on(event, handler);
-                                }
-                            }
-                        },
-                        'sui:signAndExecuteTransactionBlock': {
-                            signAndExecuteTransactionBlock: async ({ transactionBlock, account, chain }) => {
-                                console.log('🔐 Signing transaction with Phantom...');
-
-                                try {
-                                    // Phantom uses signAndExecuteTransaction (not signAndExecuteTransactionBlock)
-                                    const result = await window.phantom.sui.signAndExecuteTransaction({
-                                        transaction: transactionBlock,
-                                        options: {
-                                            showEffects: true,
-                                            showObjectChanges: true
-                                        }
-                                    });
-                                    console.log('✅ Transaction signed:', result);
-                                    return result;
-                                } catch (err) {
-                                    console.error('❌ Transaction signing failed:', err);
-                                    throw err;
-                                }
-                            }
-                        }
-                    },
-                    _phantom: window.phantom.sui // Store reference
-                });
+                console.log('✅ Found window.phantom.sui (Phantom)');
+                foundWallets.push(createWalletWrapper('Phantom', window.phantom.sui));
                 walletNames.add('Phantom');
-            } else if (walletNames.has('Phantom')) {
-                console.log('ℹ️  Phantom already in Wallet Standard API, skipping custom wrapper');
             }
 
-            console.log(`📊 Total wallets found: ${foundWallets.length}`);
+            console.log(`\n📊 Total wallets found: ${foundWallets.length}`);
             foundWallets.forEach((w, i) => console.log(`  ${i + 1}. ${w.name}`));
+
             return foundWallets;
         }
 
