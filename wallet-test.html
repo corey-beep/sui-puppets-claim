@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sui Wallet Detection Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .result {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Sui Wallet Detection Diagnostic</h1>
+    <p>This page tests all possible ways to detect Sui wallets</p>
+
+    <button onclick="testBasicDetection()">1. Test Basic Window Properties</button>
+    <button onclick="testWalletStandard()">2. Test Wallet Standard API</button>
+    <button onclick="testMystenLibrary()">3. Test Mysten Library</button>
+    <button onclick="runAllTests()">Run All Tests</button>
+
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+
+        function log(message, type = 'success') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            console.log(message);
+        }
+
+        window.testBasicDetection = function() {
+            results.innerHTML = '<h2>Test 1: Basic Window Properties</h2>';
+
+            log(`window.suiet: ${typeof window.suiet} = ${window.suiet}`, window.suiet ? 'success' : 'error');
+            log(`window.slush: ${typeof window.slush} = ${window.slush}`, window.slush ? 'success' : 'error');
+            log(`window.phantom: ${typeof window.phantom}`, window.phantom ? 'success' : 'error');
+            log(`window.phantom.sui: ${typeof window.phantom?.sui}`, window.phantom?.sui ? 'success' : 'error');
+            log(`window.suiWallet: ${typeof window.suiWallet}`, window.suiWallet ? 'success' : 'error');
+            log(`window.wallets: ${typeof window.wallets}`, window.wallets ? 'success' : 'error');
+
+            const walletProps = Object.keys(window).filter(k =>
+                k.toLowerCase().includes('wallet') ||
+                k.toLowerCase().includes('sui') ||
+                k.toLowerCase().includes('slush') ||
+                k.toLowerCase().includes('suiet')
+            );
+            log(`<br>Window properties containing 'wallet', 'sui', 'slush', 'suiet': <br>${walletProps.join('<br>') || 'NONE FOUND'}`,
+                walletProps.length > 0 ? 'success' : 'error');
+        }
+
+        window.testWalletStandard = function() {
+            results.innerHTML += '<h2>Test 2: Wallet Standard API</h2>';
+
+            if (window.wallets) {
+                log('✓ window.wallets exists', 'success');
+                log(`Type: ${typeof window.wallets}`, 'success');
+                log(`Has get(): ${typeof window.wallets.get === 'function'}`,
+                    typeof window.wallets.get === 'function' ? 'success' : 'error');
+
+                if (typeof window.wallets.get === 'function') {
+                    try {
+                        const wallets = window.wallets.get();
+                        log(`Wallets found: ${wallets.length}`, wallets.length > 0 ? 'success' : 'warning');
+                        wallets.forEach((w, i) => {
+                            log(`${i+1}. ${w.name} (version ${w.version})<br>   Chains: ${w.chains.join(', ')}`, 'success');
+                        });
+                    } catch (e) {
+                        log(`Error calling get(): ${e.message}`, 'error');
+                    }
+                }
+            } else {
+                log('✗ window.wallets does NOT exist', 'error');
+                log('This means NO wallet has registered via Wallet Standard API', 'error');
+            }
+        }
+
+        window.testMystenLibrary = async function() {
+            results.innerHTML += '<h2>Test 3: Mysten Wallet Standard Library</h2>';
+
+            try {
+                log('Importing @mysten/wallet-standard...', 'warning');
+                const { getWallets } = await import('https://esm.sh/@mysten/wallet-standard@0.12.0');
+                log('✓ Mysten library imported successfully', 'success');
+
+                const walletsApi = getWallets();
+                log('✓ getWallets() called', 'success');
+
+                const registeredWallets = walletsApi.get();
+                log(`Wallets found: ${registeredWallets.length}`, registeredWallets.length > 0 ? 'success' : 'error');
+
+                registeredWallets.forEach((w, i) => {
+                    log(`${i+1}. ${w.name} (v${w.version})<br>   Chains: ${w.chains.join(', ')}<br>   Features: ${Object.keys(w.features).join(', ')}`, 'success');
+                });
+
+                if (registeredWallets.length === 0) {
+                    log('<br><strong>NO WALLETS DETECTED BY MYSTEN LIBRARY</strong><br>This means:', 'error');
+                    log('• Either no Sui wallets are installed', 'error');
+                    log('• Or they are not implementing Wallet Standard properly', 'error');
+                    log('• Or they only inject on specific whitelisted domains', 'error');
+                }
+            } catch (error) {
+                log(`✗ Error loading Mysten library: ${error.message}`, 'error');
+            }
+        }
+
+        window.runAllTests = function() {
+            results.innerHTML = '';
+            testBasicDetection();
+            setTimeout(() => testWalletStandard(), 500);
+            setTimeout(() => testMystenLibrary(), 1000);
+        }
+
+        // Auto-run on page load
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 500);
+        });
+
+        // Listen for wallet registration
+        window.addEventListener('wallet-standard:app-ready', () => {
+            log('📢 wallet-standard:app-ready event received', 'success');
+        });
+
+        window.addEventListener('wallet-standard:register-wallet', (e) => {
+            log(`📢 wallet-standard:register-wallet event: ${e.detail?.name}`, 'success');
+        });
+    </script>
+</body>
+</html>
