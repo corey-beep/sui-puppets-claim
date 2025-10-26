@@ -275,117 +275,12 @@
             transform: translateY(-2px);
         }
 
-        /* Wallet Selector Modal */
-        .wallet-selector {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            backdrop-filter: blur(4px);
-        }
-
-        .wallet-modal {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 400px;
-            width: 90%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .wallet-modal h3 {
-            margin: 0 0 20px 0;
-            font-size: 1.5rem;
-            color: #333;
-            text-align: center;
-        }
-
-        .wallet-options {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .wallet-option {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            padding: 16px 20px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .wallet-option:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
-            transform: translateX(5px);
-        }
-
-        .wallet-option:active {
-            transform: scale(0.98);
-        }
-
-        .wallet-icon {
-            font-size: 2rem;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            border-radius: 10px;
-        }
-
-        .wallet-info {
-            flex: 1;
-        }
-
-        .wallet-name {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #333;
-            margin: 0;
-        }
-
-        .wallet-detected {
-            font-size: 0.85rem;
-            color: #667eea;
-            margin: 2px 0 0 0;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Puppets NFT Admin Dashboard</h1>
 
-        <!-- Wallet Selector Modal -->
-        <div id="walletSelector" class="wallet-selector hidden">
-            <div class="wallet-modal">
-                <h3>Choose Wallet</h3>
-                <div id="walletOptions" class="wallet-options"></div>
-            </div>
-        </div>
 
         <!-- Installation Warning (shown when no wallet detected) -->
         <div id="installWarning" class="install-warning hidden">
@@ -823,72 +718,6 @@
         // Store available wallets globally
         let availableWallets = [];
 
-        // Get wallet icon/emoji
-        function getWalletIcon(walletName) {
-            const icons = {
-                'Phantom': '👻',
-                'Suiet': '💙',
-                'Sui Wallet': '💎',
-                'Slush': '🌊',
-                'Ethos': '⚡',
-                'Martian': '🚀'
-            };
-            return icons[walletName] || '💳';
-        }
-
-        // Show wallet selector UI
-        function showWalletSelector(wallets) {
-            console.log('📋 showWalletSelector called with:', wallets);
-            console.log('  Number of wallets:', wallets.length);
-
-            const selectorDiv = document.getElementById('walletSelector');
-            const optionsDiv = document.getElementById('walletOptions');
-
-            if (!wallets || wallets.length === 0) {
-                console.error('❌ No wallets to display!');
-                return;
-            }
-
-            optionsDiv.innerHTML = '';
-
-            wallets.forEach((wallet, index) => {
-                console.log(`  Creating button for wallet ${index + 1}:`, wallet.name);
-
-                const option = document.createElement('div');
-                option.className = 'wallet-option';
-                option.innerHTML = `
-                    <div class="wallet-icon">${getWalletIcon(wallet.name)}</div>
-                    <div class="wallet-info">
-                        <div class="wallet-name">${wallet.name}</div>
-                        <div class="wallet-detected">Detected</div>
-                    </div>
-                `;
-                option.addEventListener('click', async () => {
-                    console.log(`🖱️ User clicked ${wallet.name}`);
-                    // Connect to selected wallet
-                    try {
-                        selectorDiv.classList.add('hidden');
-                        await connectToWallet(wallet);
-                    } catch (err) {
-                        console.error('Error connecting to selected wallet:', err);
-                        selectorDiv.classList.remove('hidden');
-                    }
-                });
-                optionsDiv.appendChild(option);
-            });
-
-            console.log(`✅ Created ${wallets.length} wallet buttons`);
-            selectorDiv.classList.remove('hidden');
-            console.log('✅ Modal displayed');
-
-            // Close on background click
-            selectorDiv.onclick = (e) => {
-                if (e.target === selectorDiv) {
-                    console.log('📴 User clicked outside modal, closing...');
-                    selectorDiv.classList.add('hidden');
-                }
-            };
-        }
 
         // Connect to a specific wallet
         async function connectToWallet(wallet) {
@@ -981,10 +810,10 @@
                 if (wallets && wallets.length > 0) {
                     console.log(`✅ Found ${wallets.length} wallet(s)`);
 
-                    // Always show selector so user can see what's detected and choose
-                    console.log('📋 Showing wallet selector...');
-                    console.log('  Wallets being passed to selector:', wallets);
-                    showWalletSelector(wallets);
+                    // Connect to first detected wallet
+                    const wallet = wallets[0];
+                    console.log(`🔌 Connecting directly to ${wallet.name}...`);
+                    await connectToWallet(wallet);
 
                 } else {
                     console.error('❌ No Sui Wallet detected');
