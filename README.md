@@ -121,19 +121,42 @@ public fun withdraw<T>(
 
 ## Troubleshooting
 
+### Connect button does nothing / No wallet detected
+
+**Solution:**
+1. Install the [Sui Wallet extension](https://chromewebstore.google.com/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil)
+2. Make sure the extension is **enabled** in your browser
+3. **Refresh the page** after installing
+4. Open browser console (F12) and check for logs
+5. Look for `window.suiWallets:` in console - should not be `undefined`
+
+**Still not working?**
+- Try a different browser (Chrome, Brave, or Edge)
+- Disable other wallet extensions temporarily
+- Check console for error messages
+- Make sure you're using the latest Sui Wallet version
+
 ### "Permission Required" message
 - You need to connect with the wallet that owns the TransferPolicyCap
 - Check the displayed cap owner address matches your wallet
+- The dashboard shows both addresses so you can verify
 
 ### Transaction fails
 - Ensure you have enough SUI for gas fees (~0.01 SUI)
 - Check that you're connected to Sui Mainnet (not Testnet)
 - Try refreshing the page and reconnecting
+- Check the transaction error in console (F12)
 
 ### Balance not updating
 - Wait 2-3 seconds after transaction confirmation
 - Refresh the page manually if needed
 - Check transaction on SuiScan using the provided link
+
+### Wallet connects but shows errors
+- Open browser console (F12) and look for red error messages
+- Check if you're on the correct network (Mainnet)
+- Verify your wallet has some SUI for gas fees
+- Try disconnecting and reconnecting the wallet
 
 ## Links
 
